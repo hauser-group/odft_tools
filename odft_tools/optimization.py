@@ -81,17 +81,17 @@ def run_projected_wfn_minimization(n, V, model, projection, h,
     mu = 0.
     
     for i in range(max_steps):
-        T_pred, dT_pred = model.predict(n.reshape(1,-1), derivative=True)    
-        dT_pred = dT_pred.flatten()
+        T, dT_dn = model.predict(n.reshape(1,-1), derivative=True)    
+        dT_dn = dT_dn.flatten()
         
         if update == 'no_mu':
-            grad = 2*phi*(dT_pred + V)   
+            grad = 2*phi*(dT_dn + V)   
         elif update == 'fixed_mu':
-            E = T_pred[0] + np.sum(V*n)*h    
+            E = T[0] + np.sum(V*n)*h    
             mu = E/N
-            grad = 2*phi*(dT_pred + V - mu)             
+            grad = 2*phi*(dT_dn + V - mu)             
         elif update == 'iterative_mu':
-            grad = 2*phi*(dT_pred + V - mu)
+            grad = 2*phi*(dT_dn + V - mu)
             while True:
                 phi_tmp = phi - eta*grad
                 phi_tmp /= np.sqrt(np.sum(phi_tmp**2)*h)/np.sqrt(N)
@@ -100,9 +100,9 @@ def run_projected_wfn_minimization(n, V, model, projection, h,
                 # h cancels out, sum(phi*phi) should be very close to 1...
                 mu = (np.sum(phi_tmp*phi) 
                        - np.sum(phi*phi) 
-                       + 2*eta*np.sum(phi*(dT_pred + V)*phi)
+                       + 2*eta*np.sum(phi*(dT_dn + V)*phi)
                       )/(2*eta*np.sum(phi*phi))
-                grad = 2*phi*(dT_pred + V - mu)
+                grad = 2*phi*(dT_dn + V - mu)
                 if abs(mu_old - mu) < 1e-6:
                     break
         else:

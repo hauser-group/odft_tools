@@ -1,8 +1,30 @@
 import numpy as np
 from scipy.linalg import cho_solve, cholesky
 from odft_tools.kernels import RBFKernel
+from odft_tools.utils import (first_derivative_matrix,
+                              second_derivative_matrix,
+                              integrate)
 
-class CustomKRR():
+class Model():
+    """Base class for all models"""
+    
+    def predict(self, X, derivative=False):
+        pass
+    
+class SumModel(Model):
+    
+    def __init__(self, model1, model2):
+        self.model1 = model1
+        self.model2 = model2
+        
+    def predict(self, X, derivative=False):
+        if derivative:
+            T1, dT1 = self.model1.predict(X, derivative=True)
+            T2, dT2 = self.model2.predict(X, derivative=True)
+            return T1+T2, dT1+dT2
+        return self.model1.predict(X) + self.model2.predict(X)
+
+class CustomKRR(Model):
     
     def __init__(self, kernel=RBFKernel(), lamb=1e-6, kappa=1e-6, h=1.0):
         self.kernel = kernel
@@ -80,7 +102,46 @@ class CustomKRR():
         self.lamb = data['lamb']
         self.kappa = data['kappa']
         self.fit_deriv = data['fit_deriv']
-   
+        
+
+class WeizsaeckerModel(Model):
+    """Warning: this model still predicts wrong values for the derivative at 
+    the first and last grid point where the density is zero"""
+
+    def __init__(self, G=500, h=1.0):
+        self.h = h
+        self.first_deriv = first_derivative_matrix(
+            G, h, method='five_point')
+        self.second_deriv = second_derivative_matrix(
+            G, h, method='five_point')
+    
+    def predict(self, X, derivative=False, return_tau=False):
+        phi = np.sqrt(np.abs(X))
+        tau = 0.5*(phi.dot(self.first_deriv.T))**2
+        T = integrate(tau, self.h, method='trapezoidal')        
+        if derivative:
+            dT = phi.dot(self.second_deriv.T)/(-2.*(phi+1e-16)**2)*phi
+            if return_tau:
+                return T, dT, tau
+            return T, dT
+        if return_tau:
+            return T, tau
+        return T
+
+
+class ThomasFermiModel(Model):
+    
+    def __init__(self, h=1.0):
+        self.h = h
+        
+    def predict(self, X, derivative=False):
+        tau = np.pi**2/6*X**3
+        T = integrate(tau, self.h, method='trapezoidal')
+        if derivative:
+            dT = np.pi**2/2*X**2
+            return T, dT
+        return T
+    
     
 class CustomKRR_old():
     

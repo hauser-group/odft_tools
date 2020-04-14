@@ -8,8 +8,17 @@ from odft_tools.utils import (first_derivative_matrix,
 class Model():
     """Base class for all models"""
     
-    def predict(self, X, derivative=False):
+    def predict(self, n, derivative=False):
         pass
+    
+    def predict_phi(self, phi, derivative=False):
+        """Allow models to overwrite this if the calculation
+        can be done easier on the pseudo wave function"""
+        n = phi**2
+        if derivative:
+            T, dT = self.predict(n, derivative=True)
+            return, T, 2*phi*dT
+        return self.predict(n)
     
 class SumModel(Model):
     
@@ -17,12 +26,19 @@ class SumModel(Model):
         self.model1 = model1
         self.model2 = model2
         
-    def predict(self, X, derivative=False):
+    def predict(self, n, derivative=False):
         if derivative:
-            T1, dT1 = self.model1.predict(X, derivative=True)
-            T2, dT2 = self.model2.predict(X, derivative=True)
+            T1, dT1 = self.model1.predict(n, derivative=True)
+            T2, dT2 = self.model2.predict(n, derivative=True)
             return T1+T2, dT1+dT2
-        return self.model1.predict(X) + self.model2.predict(X)
+        return self.model1.predict(n) + self.model2.predict(n)
+    
+    def predict_phi(self, phi, derivative=False):
+        if derivative:
+            T1, dT1 = self.model1.predict_phi(phi, derivative=True)
+            T2, dT2 = self.model2.predict_phi(phi, derivative=True)
+            return T1+T2, dT1+dT2
+        return self.model1.predict_phi(phi) + self.model2.predict_phi(phi)
 
 class CustomKRR(Model):
     
@@ -76,10 +92,10 @@ class CustomKRR(Model):
         
         return self
     
-    def predict(self, X, derivative=False):
+    def predict(self, n, derivative=False):
         n = self.X_train.shape[0]
-        m = X.shape[0]
-        K_star = self.kernel(self.X_train, X, dx=self.fit_deriv, dy=derivative, h=self.h)
+        m = n.shape[0]
+        K_star = self.kernel(self.X_train, n, dx=self.fit_deriv, dy=derivative, h=self.h)
         #K_star[:n, m:] /= self.h
         #K_star[n:, :m] /= self.h
         #K_star[n:, m:] /= self.h**2
@@ -115,30 +131,37 @@ class WeizsaeckerModel(Model):
         self.second_deriv = second_derivative_matrix(
             G, h, method='five_point')
     
-    def predict(self, X, derivative=False, return_tau=False):
-        phi = np.sqrt(np.abs(X))
+    def predict(self, n, derivative=False, return_tau=False):
+        phi = np.sqrt(np.abs(n))
         tau = 0.5*(phi.dot(self.first_deriv.T))**2
         T = integrate(tau, self.h, method='trapezoidal')        
         if derivative:
-            dT = phi.dot(self.second_deriv.T)/(-2.*(phi+1e-16)**2)*phi
+            dT = -phi.dot(self.second_deriv.T)/(2.*(phi+1e-16)**2)*phi
             if return_tau:
                 return T, dT, tau
             return T, dT
         if return_tau:
             return T, tau
         return T
-
+    
+    def predict_phi(self, phi)
+        tau = 0.5*(phi.dot(self.first_deriv.T))**2
+        T = integrate(tau, self.h, method='trapezoidal') 
+        if derivative:
+            dT = -phi.dot(self.second_deriv.T)
+            return T, dT
+        return T
 
 class ThomasFermiModel(Model):
     
     def __init__(self, h=1.0):
         self.h = h
         
-    def predict(self, X, derivative=False):
-        tau = np.pi**2/6*X**3
+    def predict(self, n, derivative=False):
+        tau = np.pi**2/6*n**3
         T = integrate(tau, self.h, method='trapezoidal')
         if derivative:
-            dT = np.pi**2/2*X**2
+            dT = np.pi**2/2*n**2
             return T, dT
         return T
     

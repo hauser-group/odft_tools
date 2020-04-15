@@ -70,6 +70,37 @@ def run_PCA_minimization(n, V, model, projection, h,
         warn('Not converged within max_steps')
     return n
 
+
+def run_projected_dens_minimization(n, V, model, projection, h, 
+                         eta=1e-3, max_steps=100, 
+                         g_tol=1e-6, i_print=0):
+
+    for i in range(max_steps):
+        T_pred, dT_pred = model.predict(n.reshape(1,-1), derivative=True)    
+        dT_pred = dT_pred.flatten()
+        P = projection(n)
+        grad_proj = P.dot(V + dT_pred)
+        # What does a constant function projected look like:
+        proj_norm = np.sum(P, axis=-1)
+        
+        mu = np.sum(grad_proj)/np.sum(proj_norm)
+        
+        grad = grad_proj - mu*proj_norm
+        grad_norm = np.sum(np.abs(grad))*h
+
+        if grad_norm < g_tol:
+            break
+    
+        if i_print > 0:
+            if i%i_print == 0:
+                print(i, grad_norm)
+
+        n = n - eta*grad
+    else:
+        warn('Not converged within max_steps')
+    return n
+
+
 def run_projected_wfn_minimization(n, V, model, projection, h,
                                    eta=1e-3, max_steps=100, 
                                    g_tol=1e-6, i_print=0):

@@ -48,7 +48,9 @@ class SineBasis():
         return self.P
 
     
-def run_PCA_minimization(n, V, model, projection, h, eta=1e-3, max_steps=100, g_tol=1e-6, i_print=0):
+def run_PCA_minimization(n, V, model, projection, h, 
+                         eta=1e-3, max_steps=100, 
+                         g_tol=1e-6, i_print=0):
 
     for i in range(max_steps):
         T_pred, dT_pred = model.predict(n.reshape(1,-1), derivative=True)    
@@ -70,58 +72,34 @@ def run_PCA_minimization(n, V, model, projection, h, eta=1e-3, max_steps=100, g_
 
 def run_projected_wfn_minimization(n, V, model, projection, h,
                                    eta=1e-3, max_steps=100, 
-                                   g_tol=1e-6, i_print=0,
-                                   update='fixed_mu'):
-    # Calculate total number of electrons to which the density should
-    # be normalized
-    N = np.round(np.sum(n)*h)
+                                   g_tol=1e-6, i_print=0):
     # Calculate pseudo wave function phi
     phi = np.sqrt(n)
-    # Start value for mu
-    mu = 0.
     
     for i in range(max_steps):
         T, dT_dn = model.predict(n.reshape(1,-1), derivative=True)    
         dT_dn = dT_dn.flatten()
         
-        if update == 'no_mu':
-            grad = 2*phi*(dT_dn + V)   
-        elif update == 'fixed_mu':
-            E = T[0] + np.sum(V*n)*h    
-            mu = E/N
-            grad = 2*phi*(dT_dn + V - mu)             
-        elif update == 'iterative_mu':
-            grad = 2*phi*(dT_dn + V - mu)
-            while True:
-                phi_tmp = phi - eta*grad
-                phi_tmp /= np.sqrt(np.sum(phi_tmp**2)*h)/np.sqrt(N)
+        P = projection(phi)
+        proj_grad = P.dot(phi*(dT_dn + V))
+        proj_phi = P.dot(phi)
 
-                mu_old = mu
-                # h cancels out, sum(phi*phi) should be very close to 1...
-                mu = (np.sum(phi_tmp*phi) 
-                       - np.sum(phi*phi) 
-                       + 2*eta*np.sum(phi*(dT_dn + V)*phi)
-                      )/(2*eta*np.sum(phi*phi))
-                grad = 2*phi*(dT_dn + V - mu)
-                if abs(mu_old - mu) < 1e-6:
-                    break
-        else:
-            raise NotImplemented()
+        mu = np.sum(phi*proj_grad)/np.sum(phi*proj_phi)
+        grad = 2*(proj_grad - mu*proj_phi)
 
-        grad = projection(phi).dot(grad)
-        # Norm of gradient with respect to n (divide by 2 phi)
-        grad_norm = np.sum(np.abs(grad/(2*(phi+1e-30)**2)*phi))*h            
+        # Norm of gradient
+        grad_norm = np.sum(np.abs(grad))*h            
 
         if grad_norm < g_tol:
-            break
+            break   
             
         if i_print > 0:
             if i%i_print == 0:
-                print(i, grad_norm)
+                print(i, grad_norm)    
 
-        phi = phi - eta*grad
-        phi /= np.sqrt(np.sum(phi**2)*h)/np.sqrt(N)           
-        n = phi**2
+        phi = phi - eta*grad     
+        n = phi**2     
+        
     else:
         warn('Not converged within max_steps')
     return n

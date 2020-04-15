@@ -17,7 +17,7 @@ class Model():
         n = phi**2
         if derivative:
             T, dT = self.predict(n, derivative=True)
-            return, T, 2*phi*dT
+            return T, 2*phi*dT
         return self.predict(n)
     
 class SumModel(Model):
@@ -92,10 +92,10 @@ class CustomKRR(Model):
         
         return self
     
-    def predict(self, n, derivative=False):
+    def predict(self, X, derivative=False):
         n = self.X_train.shape[0]
-        m = n.shape[0]
-        K_star = self.kernel(self.X_train, n, dx=self.fit_deriv, dy=derivative, h=self.h)
+        m = X.shape[0]
+        K_star = self.kernel(self.X_train, X, dx=self.fit_deriv, dy=derivative, h=self.h)
         #K_star[:n, m:] /= self.h
         #K_star[n:, :m] /= self.h
         #K_star[n:, m:] /= self.h**2
@@ -144,7 +144,7 @@ class WeizsaeckerModel(Model):
             return T, tau
         return T
     
-    def predict_phi(self, phi)
+    def predict_phi(self, phi):
         tau = 0.5*(phi.dot(self.first_deriv.T))**2
         T = integrate(tau, self.h, method='trapezoidal') 
         if derivative:

@@ -31,12 +31,12 @@ class SineBasis():
         """ G number of grid points, 
             h spacing of grid points, 
             l number of sine waves"""
+        self.l = l
         x = np.arange(G)*h
         l_vec = np.arange(1, l+1)
         # normalized such that the sum over the squared basis function
         # equals 1
-        norm = np.sqrt(1/2 - np.sin(2*l*np.pi)/(4*l*np.pi))/np.sqrt(h)
-        self.basis_fun = np.sin(np.pi*np.outer(x, l_vec))/norm
+        self.basis_fun = np.sin(np.pi*np.outer(x, l_vec))*np.sqrt(2*h)
         # The norm defined earlier ensures that the eigenvalues of the
         # projection matrix are 1.
         self.P = self.basis_fun.dot(self.basis_fun.T)

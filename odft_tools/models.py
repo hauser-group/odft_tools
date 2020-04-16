@@ -1,4 +1,5 @@
 import numpy as np
+import tensorflow as tf
 from scipy.linalg import cho_solve, cholesky
 from odft_tools.kernels import RBFKernel
 from odft_tools.utils import (first_derivative_matrix,
@@ -166,6 +167,31 @@ class ThomasFermiModel(Model):
         return T
     
     
+class TFModelWrapper(Model):
+
+    def __init__(self, path, h=1.0):
+        self.h = h
+        self.tf_model = tf.saved_model.load(path)
+
+    def predict(self, n, derivative=False):
+        if derivative:
+            T, dT = self.tf_predict(n, derivative=True)
+            return T.numpy(), dT.numpy()
+        return self.tf_predict(n, derivative=False).numpy()
+
+    @tf.function
+    def tf_predict(self, n, derivative=False):
+        """Helper function needed to build the graph"""
+        if derivative:
+            with tf.GradientTape() as tape:
+                tape.watch(n)
+                T = self.tf_model({'density': tf.cast(n, dtype=tf.float32)})['kinetic_energy']
+
+            dT = 1/self.h*tape.gradient(T, n)
+            return T, dT
+        return self.tf_model({'density': tf.cast(n, dtype=tf.float32)})['kinetic_energy']
+
+
 class CustomKRR_old():
     
     def __init__(self, kernel=RBFKernel(), lamb=1e-6):

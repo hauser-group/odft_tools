@@ -68,6 +68,7 @@ def run_PCA_minimization(n, V, model, projection, h,
         n = n - eta*grad
     else:
         warn('Not converged within max_steps')
+        print('Not converged, final projected gradient norm was:', grad_norm)
     return n
 
 
@@ -98,6 +99,7 @@ def run_projected_dens_minimization(n, V, model, projection, h,
         n = n - eta*grad
     else:
         warn('Not converged within max_steps')
+        print('Not converged, final projected gradient norm was:', grad_norm)
     return n
 
 
@@ -133,4 +135,5 @@ def run_projected_wfn_minimization(n, V, model, projection, h,
         
     else:
         warn('Not converged within max_steps')
+        print('Not converged, final projected gradient norm was:', grad_norm)
     return n

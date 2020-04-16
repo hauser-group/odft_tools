@@ -169,9 +169,10 @@ class ThomasFermiModel(Model):
     
 class TFModelWrapper(Model):
 
-    def __init__(self, path, h=1.0):
+    def __init__(self, path, h=1.0, dict_input=True):
         self.h = h
         self.tf_model = tf.saved_model.load(path)
+        self.dict_input = dict_input
 
     def predict(self, n, derivative=False):
         if derivative:
@@ -185,11 +186,15 @@ class TFModelWrapper(Model):
         if derivative:
             with tf.GradientTape() as tape:
                 tape.watch(n)
-                T = self.tf_model({'density': tf.cast(n, dtype=tf.float32)})['kinetic_energy']
-
+                if self.dict_input:
+                    T = self.tf_model({'density': tf.cast(n, dtype=tf.float32)})['kinetic_energy']
+                else:
+                    T = self.tf_model(tf.cast(n, dtype=tf.float32))['kinetic_energy']
             dT = 1/self.h*tape.gradient(T, n)
             return T, dT
-        return self.tf_model({'density': tf.cast(n, dtype=tf.float32)})['kinetic_energy']
+        if self.dict_input:
+            return self.tf_model({'density': tf.cast(n, dtype=tf.float32)})['kinetic_energy']
+        return self.tf_model(tf.cast(n, dtype=tf.float32))['kinetic_energy']
 
 
 class CustomKRR_old():

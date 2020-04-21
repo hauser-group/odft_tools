@@ -64,7 +64,6 @@ class DerivativeTest(unittest.TestCase):
         # since the 3 point method is O(h^2).
         # Only checking for reduction > 3.9:
         abs_errors = self.eval_second_deriv_errors('three_point')
-        print(abs_errors[0:-1] / abs_errors[1:])
         self.assertTrue(np.all(abs_errors[0:-1] / abs_errors[1:] > 3.9))
         
     def test_second_deriv_matrix_five_point(self):
@@ -73,7 +72,6 @@ class DerivativeTest(unittest.TestCase):
         # since the 5 point method is O(h^4).
         # Only checking for reduction > 15:
         abs_errors = self.eval_second_deriv_errors('five_point')
-        print(abs_errors[0:-1] / abs_errors[1:])
         self.assertTrue(np.all(abs_errors[0:-1] / abs_errors[1:] > 15))
        
         

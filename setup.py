@@ -2,6 +2,9 @@ from setuptools import Extension, setup
 from Cython.Build import cythonize
 import numpy as np
 
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
+
 ext_modules = [
     Extension(
         'odft_tools.cython_kernels',
@@ -20,4 +23,5 @@ setup(name='odft_tools',
       author_email='meyer.ralf@yahoo.com',
       packages=['odft_tools'],
       ext_modules = cythonize(ext_modules),
+      install_requires=requirements,
       zip_safe=False)

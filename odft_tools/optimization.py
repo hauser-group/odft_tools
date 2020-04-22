@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.sparse.linalg import eigsh
 from warnings import warn
+from odft_tools.utils import integrate
 
 class PCA():
     
@@ -56,7 +57,7 @@ def run_PCA_minimization(n, V, model, projection, h,
         T_pred, dT_pred = model.predict(n.reshape(1,-1), derivative=True)    
         dT_pred = dT_pred.flatten()
         grad = projection(n).dot(V + dT_pred)
-        grad_norm = np.sum(np.abs(grad))*h
+        grad_norm = integrate(np.abs(grad), h, method='trapezoidal')
 
         if grad_norm < g_tol:
             break
@@ -87,7 +88,7 @@ def run_projected_dens_minimization(n, V, model, projection, h,
         mu = np.sum(grad_proj)/np.sum(proj_norm)
         
         grad = grad_proj - mu*proj_norm
-        grad_norm = np.sum(np.abs(grad))*h
+        grad_norm = integrate(np.abs(grad), h, method='trapezoidal')
 
         if grad_norm < g_tol:
             break
@@ -121,7 +122,7 @@ def run_projected_wfn_minimization(n, V, model, projection, h,
         grad = 2*(proj_grad - mu*proj_phi)
 
         # Norm of gradient
-        grad_norm = np.sum(np.abs(grad))*h            
+        grad_norm = integrate(np.abs(grad), h, method='trapezoidal')          
 
         if grad_norm < g_tol:
             break   

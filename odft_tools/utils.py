@@ -1,6 +1,6 @@
 import numpy as np
 
-def integrate(fun, h, method='simple'):
+def integrate(fun, h, method='trapezoidal'):
     if method == 'simple':
         return np.sum(fun, axis=-1)*h
     elif method == 'trapezoidal':

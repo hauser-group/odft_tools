@@ -47,6 +47,6 @@ class RBFKernel():
                             np.eye(n_dim) - np.outer(scaled_diff, scaled_diff))
                 else:
                     if dx:
-                        raise NotImplemented()
+                        K[di, j] = -K[i, j]*scaled_diff/lh
         K[:n, :m] += self.constant
         return K

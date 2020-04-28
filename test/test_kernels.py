@@ -1,6 +1,7 @@
 import numpy as np
 import unittest
 from odft_tools.kernels import RBFKernel
+from odft_tools.cython_kernels import RBFKernel as RBFKernel_cy
 
 class KernelTest():
     class KernelTest(unittest.TestCase):
@@ -165,9 +166,34 @@ class KernelTest():
             np.testing.assert_allclose(J_prime_ref, J_prime_num, atol=1e-10)
             np.testing.assert_allclose(H_ref, H_num, atol=1e-10)
             
+        def test_call_method(self):
+            """Tests if the different kwargs to the __call__ method, i.e. dx and dy
+            give consistent results"""
+            n = 4
+            m = 3
+            np.random.seed(0)
+            X = np.random.randn(n, self.n_dim)
+            Y = np.random.randn(m, self.n_dim)
+            
+            K = self.kernel(X, Y, dx=True, dy=True)
+            K_ref = K[:n, :m]
+            J_ref = K[n:, :m]
+            J_prime_ref = K[:n, m:]
+            
+            K_test = self.kernel(X, Y, dx=True, dy=False)
+            np.testing.assert_allclose(K[:n, :m], K_ref)
+            np.testing.assert_allclose(K[n:, :m], J_ref)
+            
+            K_test = self.kernel(X, Y, dx=False, dy=True)
+            np.testing.assert_allclose(K[:n, :m], K_ref)
+            np.testing.assert_allclose(K[:n, m:], J_prime_ref)
             
 class RBFKernelTest(KernelTest.KernelTest):
     kernel = RBFKernel(length_scale=2.2)
+    n_dim = 15
+    
+class CythonRBFKernelTest(KernelTest.KernelTest):
+    kernel = RBFKernel_cy(length_scale=2.2)
     n_dim = 15
     
 if __name__ == '__main__':

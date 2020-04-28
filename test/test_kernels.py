@@ -2,6 +2,7 @@ import numpy as np
 import unittest
 from odft_tools.kernels import RBFKernel
 from odft_tools.cython_kernels import RBFKernel as RBFKernel_cy
+from odft_tools.modular_cython_kernels import RBFKernel as RBFKernel_mod_cy
 
 class KernelTest():
     class KernelTest(unittest.TestCase):
@@ -189,11 +190,15 @@ class KernelTest():
             np.testing.assert_allclose(K[:n, m:], J_prime_ref)
             
 class RBFKernelTest(KernelTest.KernelTest):
-    kernel = RBFKernel(length_scale=2.2)
+    kernel = RBFKernel(length_scale=2.2, scale=1.2, constant=0.6)
     n_dim = 15
     
 class CythonRBFKernelTest(KernelTest.KernelTest):
-    kernel = RBFKernel_cy(length_scale=2.2)
+    kernel = RBFKernel_cy(length_scale=2.2, scale=1.2, constant=0.6)
+    n_dim = 15
+    
+class ModularCythonRBFKernelTest(KernelTest.KernelTest):
+    kernel = RBFKernel_mod_cy(length_scale=2.2, scale=1.2, constant=0.6)
     n_dim = 15
     
 if __name__ == '__main__':

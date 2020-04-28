@@ -12,6 +12,13 @@ ext_modules = [
         extra_compile_args=['-fopenmp'],
         extra_link_args=['-fopenmp'],
         include_dirs=[np.get_include()],
+    ),
+    Extension(
+        'odft_tools.modular_cython_kernels',
+        ['odft_tools/modular_cython_kernels.pyx'],
+        extra_compile_args=['-fopenmp'],
+        extra_link_args=['-fopenmp'],
+        include_dirs=[np.get_include()],
     )
 ]
 

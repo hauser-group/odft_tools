@@ -119,6 +119,100 @@ class CustomKRR(Model):
         self.lamb = data['lamb']
         self.kappa = data['kappa']
         self.fit_deriv = data['fit_deriv']
+
+
+class DerivOnlyKRR(CustomKRR):
+            
+    def fit(self, X_train, Y, dY_dX, offset='mean'):
+        n = X_train.shape[0]
+        n_dim = X_train.shape[1]
+        self.X_train = X_train
+        self.fit_deriv = True
+        
+        K = self.kernel(X_train, X_train, dx=True, dy=True, h=self.h)[n:, n:]
+            #K[:n, n:] /= self.h
+            #K[n:, :n] /= self.h
+            #K[n:, n:] /= self.h**2
+        K[np.diag_indices(n*n_dim)] += self.lamb*n_dim/self.kappa
+        target_vector = dY_dX.flatten()
+
+        K = np.linalg.cholesky(K)
+        self.alpha = cho_solve((K, True), target_vector)
+        
+        if offset == 'mean':
+            K = self.kernel(X_train, X_train, dx=True, dy=False, h=self.h)[n:, :]
+            self.offset = np.mean(Y - self.alpha.dot(K))
+        else:
+            self.offset = 0
+        return self
+    
+    def predict(self, X, derivative=False):
+        n = self.X_train.shape[0]
+        m = X.shape[0]
+        K_star = self.kernel(self.X_train, X, dx=True, dy=derivative, h=self.h)[n:, :]
+        #K_star[:n, m:] /= self.h
+        #K_star[n:, :m] /= self.h
+        #K_star[n:, m:] /= self.h**2
+        out = self.alpha.dot(K_star)
+        if derivative:
+            return self.offset + out[:m], out[m:].reshape(m, -1)
+        return self.offset + out
+        
+
+class CustomKRR_new(CustomKRR):
+    
+    def fit(self, X_train, Y, dY_dX=None, offset=None, inplace=True):
+        n = X_train.shape[0]
+        n_dim = X_train.shape[1]
+        self.X_train = X_train
+        self.fit_deriv = not dY_dX is None
+        
+        try:
+            self.offset = float(offset)
+        except (ValueError, TypeError):
+            if offset is None:
+                self.offset = 0.0
+            elif offset == 'mean':
+                self.offset = np.mean(Y)
+            elif offset == 'max':
+                self.offset = np.max(Y)
+            elif isinstance(offset, str) and offset.startswith('max+'):
+                self.offset = (np.max(Y) + float(offset[4:]))
+            else:
+                raise NotImplementedError(
+                    'Unknown option: %s' % offset)
+        
+        if self.fit_deriv:
+            K = self.kernel(X_train, X_train, dx=True, dy=True, h=self.h)
+            K[np.diag_indices(n*(1+n_dim))] += np.concatenate(
+                [self.lamb*np.ones(n), self.lamb*n_dim/self.kappa*np.ones(n*n_dim)])
+            target_vector = np.concatenate([Y - self.offset, dY_dX.flatten()])
+        else:
+            K = self.kernel(X_train, X_train)
+            K[np.diag_indices(n)] += self.lamb*np.ones(n)
+            target_vector = Y - self.offset
+        if inplace:
+            # Using K.T and lower=False instead of K and lower=True for overwrite_a to work
+            # check: https://stackoverflow.com/questions/14408873/how-to-do-in-place-cholesky-factorization-in-python
+            cholesky(K.T, lower=False, overwrite_a=True)
+        else:
+            # Somehow the scipy version segfaults for large arrays, fallback to numpy:
+            K = np.linalg.cholesky(K)
+        self.alpha = cho_solve((K, True), target_vector)
+        
+        return self
+    
+    def predict(self, X, derivative=False):
+        n = self.X_train.shape[0]
+        m = X.shape[0]
+        K_star = self.kernel(self.X_train, X, dx=self.fit_deriv, dy=derivative, h=self.h)
+        #K_star[:n, m:] /= self.h
+        #K_star[n:, :m] /= self.h
+        #K_star[n:, m:] /= self.h**2
+        out = self.alpha.dot(K_star)
+        if derivative:
+            return self.offset + out[:m], out[m:].reshape(m, -1)
+        return self.offset + out
         
 
 class WeizsaeckerModel(Model):

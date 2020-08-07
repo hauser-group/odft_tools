@@ -3,7 +3,7 @@ cimport numpy as np
 cimport cython
 from libc.math cimport exp
 from libc.stdlib cimport malloc, free
-#from cython.parallel import prange
+from cython.parallel import prange
 
 ctypedef np.float_t DTYPE_t
 

@@ -115,6 +115,78 @@ cdef class RBFKernel:
         return K
     
     
+cdef class ConvolutionalRBFKernel:
+    
+    cdef public DTYPE_t p
+    cdef public DTYPE_t length_scale
+    cdef public DTYPE_t scale
+    cdef public DTYPE_t constant    
+    
+    def __init__(self, p=2, length_scale=1.0):
+        self.p = 2
+        self.length_scale = length_scale
+    
+#    @cython.cdivision(True)
+#    @cython.boundscheck(False)
+#    @cython.wraparound(False) 
+#    def __call__(self, 
+#                 DTYPE_t[:,::1] X,
+#                 DTYPE_t[:,::1] Y,
+#                 bint dx=False, bint dy=False, 
+#                 DTYPE_t h=1.0):
+#        cdef Py_ssize_t n = X.shape[0]
+#        cdef Py_ssize_t m = Y.shape[0]
+#        cdef Py_ssize_t n_dim = X.shape[1]
+#        cdef Py_ssize_t i, j, g1, g2
+#        cdef DTYPE_t dist, Kij_over_l, Kij_over_l2
+#        cdef DTYPE_t[::1] diff = np.zeros(2*self.p + 1)
+#        cdef np.ndarray[DTYPE_t, ndim=2] K = np.zeros((n*(1 + int(dx)*n_dim),
+#                                                       m*(1 + int(dy)*n_dim)))
+#        
+#        for i in range(n):
+#            for j in range(m):
+#                for g1 in range(n_dim):
+#                    for g2 in range(n_dim):
+#                        dist = 0.
+#                        for q in range(-p, p+1):
+#                            # Zero padding:
+#                            if ((g1 + q >= 0 and g1 + q < n_dim) 
+#                                    and (g2 + q >= 0 and g2 + q < n_dim)):
+#                                diff[q+p] = (X[i, g1+q] - Y[j, g2+q])/self.length_scale
+#                            
+#                            dist = dist + diff[q+p]*diff[q+p]
+#                        Kij_g1g2 = self.scale * exp(-0.5*dist)
+#                        K[i, j] += Kij_g1g2
+#                        
+#                        for q in range(-p, p+1)
+#                            for q2 in range(-p, p+1)
+#                dist = 0.
+#                for d in range(n_dim):
+#                    diff[d] = (X[i, d] - Y[j, d])/self.length_scale
+#                    dist = dist + diff[d]*diff[d]
+#                K[i, j] = self.scale * exp(-0.5*dist)
+#                Kij_over_l = K[i, j]/(self.length_scale*h)
+#                Kij_over_l2 = Kij_over_l/(self.length_scale*h)
+#                if dy and not dx:
+#                    for d in range(n_dim):
+#                        K[i, m + j*n_dim + d] = diff[d]*Kij_over_l
+#                if dx and not dy:
+#                    for d in range(n_dim):
+#                        K[n + i*n_dim + d, j] = -diff[d]*Kij_over_l
+#                if dx and dy:
+#                    for d in range(n_dim):
+#                        K[i, m + j*n_dim + d] = diff[d]*Kij_over_l
+#                        K[n + i*n_dim + d, j] = -K[i, m + j*n_dim + d]
+#                        for d2 in range(n_dim):
+#                            K[n + i*n_dim + d, m + j*n_dim + d2] = (
+#                                - diff[d]*diff[d2])*Kij_over_l2
+#                        # Add the diagonal element d==d2
+#                        K[n + i*n_dim + d, m + j*n_dim + d] = (
+#                            K[n + i*n_dim + d, m + j*n_dim + d] + Kij_over_l2)
+#                K[i, j] = K[i, j] + self.constant
+#        return K
+    
+    
 cdef class RBFKernel_extern:
     """Just for testing purposes"""
     

@@ -15,3 +15,19 @@ class IntegrateLayer(tf.keras.layers.Layer):
         config = super().get_config()
         config.update({'h': self.h})
         return config
+
+
+class ContinuousConv1D(tf.keras.layers.Layer):
+    """
+    Arguments:
+        filters: Integer, the dimensionality of the output space
+            (i.e. the number of output filters in the convolution).
+    """
+
+    def __init__(self, filters, **kwargs):
+        super().__init__(**kwargs)
+        # Add weights etc
+
+    def call(self, inputs):
+        # Actual implementation of the convolution goes here
+        pass

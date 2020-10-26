@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from odft_tools.gaussian_kernel1D import GaussianKernel1D
+from odft_tools.kernels import GaussianKernel1D
 from odft_tools.init_ops_v2 import VarianceScaling
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.keras.engine.input_spec import InputSpec

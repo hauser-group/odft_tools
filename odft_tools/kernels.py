@@ -7,24 +7,26 @@ from tensorflow.python.ops.init_ops_v2 import (
 
 from tensorflow.python.framework import dtypes
 from tensorflow.python.ops.init_ops_v2 import _assert_float_dtype
+from tensorflow.python.ops.init_ops import _compute_fans
 
 import tensorflow as tf
 import numpy as np
+import math
 
 
 class GaussianKernel1D(Initializer):
     def __init__(self,
-                 mean=0.0,
+                 weights_init=None,
                  stddev=1.0):
 
-        if stddev < 0:
-            raise ValueError("'stddev' must be positive float")
-
-        if mean < 0:
+        if weights_init[0] < 0:
             raise ValueError("'mean' must be positive float")
 
-        self.mean = mean
-        self.stddev = stddev
+        if weights_init[1] < 0:
+            raise ValueError("'stddev' must be positive float")
+
+
+        self.weights_init = weights_init
 
     def __call__(self, shape, dtype=dtypes.float32):
         """Returns a tensor object initialized as specified by the initializer.
@@ -36,23 +38,118 @@ class GaussianKernel1D(Initializer):
           ValueError: If the dtype is not floating point
         """
 
-        stddev = self.stddev
-        mean = self.mean
-
         dtype = _assert_float_dtype(dtype)
 
+        mean = [[self.weights_init[0]] * shape[2]] * shape[1]
+        stddev = [[self.weights_init[1]] * shape[2]] * shape[1]
+
+        weights_init = tf.concat([[mean, stddev]], 0)
+        shape_weights = (2, shape[1], shape[2])
+
+        weights_init = tf.reshape(weights_init, shape_weights, name=None)
         gauss_kernel = gen_gaussian_kernel1D(
             shape=shape,
-            mean=mean,
-            stddev=stddev,
+            weights=weights_init,
             dtype=dtype)
-
         return gauss_kernel
 
     def get_config(self):
         return {
+            "mean": self.weights_init[0],
+            "stddev": self.weights_init[1]
+        }
+
+
+class GaussianKernel1DWeights(Initializer):
+    """docstring for GaussianKernel1DWeights"""
+    def __init__(self,
+                 weights_init=None,
+                 seed=None,
+                 scale=1.0,
+                 mode="fan",
+                 distribution="truncated_normal"):
+
+        if scale <= 0.:
+            raise ValueError("`scale` must be positive float.")
+        if mode not in {"fan", "fan_out", "fan_avg"}:
+            raise ValueError("Invalid `mode` argument:", mode)
+        distribution = distribution.lower()
+        # Compatibility with keras-team/keras.
+        if distribution == "normal":
+            distribution = "truncated_normal"
+        if distribution not in {"uniform", "truncated_normal",
+                                "untruncated_normal"}:
+            raise ValueError("Invalid `distribution` argument:", distribution)
+
+        self.seed = seed
+        self._random_generator = _RandomGenerator(seed)
+        self.weights_init = weights_init
+        self.mode = mode
+        self.distribution = 'untruncated_normal'#distribution
+        self.mode = mode
+        self.scale = scale
+
+    def __call__(self, shape, dtype=dtypes.float32):
+        """Returns a tensor object initialized as specified by the initializer.
+        Args:
+          shape: Shape of the tensor.
+          dtype: Optional dtype of the tensor. Only floating point types are
+          supported.
+        Raises:
+          ValueError: If the dtype is not floating point
+        """
+
+        mean = self.weights_init[0]
+        stddev = self.weights_init[1]
+
+        dtype = _assert_float_dtype(dtype)
+
+        partition_info = None  # Keeps logic so can be readded later if necessary
+        dtype = _assert_float_dtype(dtype)
+        scale = self.scale
+        scale_shape = shape
+
+        if partition_info is not None:
+            scale_shape = partition_info.full_shape
+
+        fan, fan_out = _compute_fans(scale_shape)
+        if self.mode == "fan":
+            scale /= max(1., fan)
+        elif self.mode == "fan_out":
+            scale /= max(1., fan_out)
+        else:
+            scale /= max(1., (fan + fan_out) / 2.)
+        
+        shape_weight = (int(shape[0]/2), shape[1], shape[2])
+
+        limit = math.sqrt(3.0 * scale)
+        if stddev is None:
+            stddev = self._random_generator.random_uniform(shape_weight, 0, limit, dtype)
+        else:
+            stddev = tf.convert_to_tensor(
+                value=[[stddev] * shape_weight[1]] * shape_weight[2], 
+                dtype=dtype
+            )
+        if mean is None:
+            mean = self._random_generator.random_uniform(shape_weight, 0, limit, dtype)
+        else:
+            mean = tf.convert_to_tensor(
+                value=[[mean] * shape_weight[1]] * shape_weight[2], 
+                dtype=dtype
+            )
+
+        weights = tf.concat([[mean, stddev]], 0)
+        weights = tf.reshape(weights, shape, name=None)
+        return weights
+
+    def get_config(self):
+        return {
             "mean": self.mean,
-            "stddev": self.stddev
+            "stddev": self.stddev,
+            "scale": self.scale,
+            "mode": self.mode,
+            "distribution": self.distribution,
+            "seed": self.seed
         }
 
 

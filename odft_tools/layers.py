@@ -1,12 +1,19 @@
-import tensorflow as tf
-import numpy as np
-from odft_tools.kernels import GaussianKernel1D
+from odft_tools.kernels import (
+    GaussianKernel1D,
+    GaussianKernel1DWeights
+)
 from odft_tools.init_ops_v2 import VarianceScaling
+from odft_tools.utils import gen_gaussian_kernel1D
+
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.keras.engine.input_spec import InputSpec
-import six
-import functools
 from tensorflow.python.ops import nn_ops
+from tensorflow.python.ops import nn
+
+import tensorflow as tf
+import numpy as np
+import functools
+import six
 
 
 class IntegrateLayer(tf.keras.layers.Layer):
@@ -33,18 +40,24 @@ class ContinuousConv1D(tf.python.keras.layers.convolutional.Conv1D):
     """
 
     def __init__(self,
-                 mean=0,
-                 stddev=1,
+                 weights_init=None,
                  **kwargs):
         super().__init__(**kwargs)
 
-        self.mean = mean
-        self.stddev = stddev
+        self.weights_init = weights_init
         # self.kernel_initializer = VarianceScaling()
         self.kernel_initializer = GaussianKernel1D(
-            mean=self.mean,
-            stddev=stddev
+            weights_init=self.weights_init
         )
+        self.kernel_shape = None
+
+        self.gaussian_weights_initializer = GaussianKernel1DWeights(
+            weights_init=self.weights_init)
+
+        self.gaussian_weights_shape = None
+        self.gaussian_weights_regularizer = None
+        self.gaussian_weights_constraint = None
+
 
     def build(self, input_shape):
         input_shape = tensor_shape.TensorShape(input_shape)
@@ -56,16 +69,18 @@ class ContinuousConv1D(tf.python.keras.layers.convolutional.Conv1D):
                 'channels (full input shape is {}).'.format(self.groups,
                                                             input_channel,
                                                             input_shape))
-
-        kernel_shape = self.kernel_size + (input_channel // self.groups,
+        self.kernel_shape = self.kernel_size + (input_channel // self.groups,
                                            self.filters)
 
-        self.kernel = self.add_weight(
-            name='kernel',
-            shape=kernel_shape,
-            initializer=self.kernel_initializer,
-            regularizer=self.kernel_regularizer,
-            constraint=self.kernel_constraint,
+        self.gaussian_weights_shape = (2, ) + (input_channel // self.groups,
+                                           self.filters)
+
+        self.weights_gausian = self.add_weight(
+            name='gaussian_weights',
+            shape=self.gaussian_weights_shape,
+            initializer=self.gaussian_weights_initializer,
+            regularizer=self.gaussian_weights_regularizer,
+            constraint=self.gaussian_weights_constraint,
             trainable=True,
             dtype=self.dtype)
 
@@ -106,3 +121,40 @@ class ContinuousConv1D(tf.python.keras.layers.convolutional.Conv1D):
             data_format=self._tf_data_format,
             name=tf_op_name)
         self.built = True
+
+    def call(self, inputs):
+        if self._is_causal:  # Apply causal padding to inputs for Conv1D.
+            inputs = array_ops.pad(inputs,
+                                   self._compute_causal_padding(inputs))
+
+        gaussian_weights_kernel = gen_gaussian_kernel1D(
+            shape=self.kernel_shape,
+            weights=self.weights_gausian
+        )
+        outputs = self._convolution_op(inputs, gaussian_weights_kernel)
+
+        if self.use_bias:
+            output_rank = outputs.shape.rank
+        if self.rank == 1 and self._channels_first:
+            # nn.bias_add does not accept a 1D input tensor.
+            bias = array_ops.reshape(self.bias, (1, self.filters, 1))
+            outputs += bias
+        else:
+            # Handle multiple batch dimensions.
+            if output_rank is not None and output_rank > 2 + self.rank:
+
+                def _apply_fn(o):
+                    return nn.bias_add(o, self.bias,
+                                       data_format=self._tf_data_format)
+
+                outputs = nn_ops.squeeze_batch_dims(
+                    outputs,
+                    _apply_fn,
+                    inner_rank=self.rank + 1)
+            else:
+                outputs = nn.bias_add(
+                    outputs, self.bias, data_format=self._tf_data_format)
+
+        if self.activation is not None:
+            return self.activation(outputs)
+        return outputs

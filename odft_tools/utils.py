@@ -53,7 +53,7 @@ def second_derivative_matrix(G, h, method='three_point'):
     mat /= h**2    
     return mat
 
-def gen_gaussian_kernel1D(shape, mean, stddev, dtype=dtypes.float32):
+def gen_gaussian_kernel1D(shape, weights, dtype=dtypes.float32):
     """ Returns a tensor object cotnaining gaussian kernels
     Args:
       shape: Shape of the tensor.
@@ -62,6 +62,8 @@ def gen_gaussian_kernel1D(shape, mean, stddev, dtype=dtypes.float32):
       dtype: Optional dtype of the tensor. Only floating point types are
          supported.
     """ 
+    means = tf.reshape(weights[0, :, :], [-1])
+    stddevs = tf.reshape(weights[1, :, :], [-1])
 
     kernel_size = shape[0]
     input_size = shape[1]
@@ -74,32 +76,44 @@ def gen_gaussian_kernel1D(shape, mean, stddev, dtype=dtypes.float32):
     width = int(truncate + 0.5)
     # width = int(truncate * stddev + 0.5)
     # width = truncate
-    support = np.arange(-width, width + 1)
+    support = tf.convert_to_tensor(
+      value=np.arange(-width, width + 1),
+      dtype=dtype
+    )
     
-    gauss_kernels = []
+    gauss_kernels = tf.TensorArray(dtype, size=0, dynamic_size=True)
 
 
     center = int(len(support)/2)
     left_cut = center - int(kernel_size/2)
     right_cut = center + int(kernel_size/2)
 
-    for i in range(gaus_kerne_count):
-        gauss_kernel = np.exp(-((support - mean) ** 2)/(2*stddev ** 2))
-        gauss_kernel = gauss_kernel / gauss_kernel.sum()
+    for i in tf.range(gaus_kerne_count):
+        mean = means[i]
+        stddev = stddevs[i]
+        gauss_kernel = tf.math.exp(-((support - mean) ** 2)/(2*stddev ** 2))
+        gauss_kernel = gauss_kernel / tf.math.reduce_sum(gauss_kernel)
+        # gauss_kernel = gauss_kernel / gauss_kernel.sum()
+        
 
         if (kernel_size % 2) != 0:
             gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 2]
         else:
             gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 1]
-        gauss_kernels.append(gauss_kernel)
+        gauss_kernels = gauss_kernels.write(gauss_kernels.size(), gauss_kernel)
 
-    gauss_kernels = np.reshape(
-      gauss_kernels, (
-        filter_size,
-        input_size,
-        kernel_size
-        ) 
-      ).T
+
+    gauss_kernels = gauss_kernels.stack()
+    gauss_kernels = tf.transpose(
+      tf.reshape(
+        gauss_kernels, 
+        (
+          filter_size,
+          input_size,
+          kernel_size
+        )
+      )
+    )
 
     gauss_kernels = tf.convert_to_tensor(
         value=gauss_kernels,

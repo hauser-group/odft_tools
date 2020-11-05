@@ -471,18 +471,13 @@ class VarianceScaling(Initializer):
       # constant from scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
       stddev = math.sqrt(scale) / .87962566103423978
       test = self._random_generator.truncated_normal(shape, 0.0, stddev, dtype)
-      print(np.shape(test))
-      print(test)
-      print(test[0, 0, :])
+
       return self._random_generator.truncated_normal(shape, 0.0, stddev, dtype)
     elif self.distribution == "untruncated_normal":
       stddev = math.sqrt(scale)
-      print(self._random_generator.random_normal(shape, 0.0, stddev, dtype))
       return self._random_generator.random_normal(shape, 0.0, stddev, dtype)
     else:
       limit = math.sqrt(3.0 * scale)
-      print('ccccc')
-      print(self._random_generator.random_uniform(shape, -limit, limit, dtype))
       return self._random_generator.random_uniform(shape, -limit, limit, dtype)
 
   def get_config(self):

@@ -1,10 +1,68 @@
 import numpy as np
+import keras
 import tensorflow as tf
+
 from scipy.linalg import cho_solve, cholesky
 from odft_tools.kernels import RBFKernel
 from odft_tools.utils import (first_derivative_matrix,
                               second_derivative_matrix,
                               integrate)
+from odft_tools.layers import ContinuousConv1D
+from keras.layers.convolutional import MaxPooling1D
+from keras.layers import Dropout
+from keras.layers import Flatten
+from keras.layers import Dense
+from tensorflow.python.keras.engine import base_layer
+from tensorflow.python.eager import monitoring
+
+
+class CuntModel(keras.Model):
+    def __init__(self, input_shape, weights, n_outputs):
+        super(CuntModel, self).__init__()
+        self.layer1 = ContinuousConv1D(filters=64, kernel_size=60, activation='relu', input_shape=input_shape, weights_init=weights)
+
+        self.layer2 = ContinuousConv1D(filters=64, kernel_size=60, activation='relu', weights_init=[0, 0.05])
+        self.layer3 = Dropout(0.5)
+        self.layer4 = MaxPooling1D(pool_size=2)
+        self.layer5 = Flatten()
+        self.layer6 = Dense(100, activation='relu')
+        self.layer7 = Dense(n_outputs, activation='softmax')
+
+    def call(self, inputs):
+        x = self.layer1(inputs)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.layer5(x)
+        x = self.layer6(x)
+        x = self.layer7(x)
+
+        return x
+
+    def train_step(self, data):
+        # Unpack the data. Its structure depends on your model and
+        # on what you pass to `fit()`.
+        x, y = data
+
+        with tf.GradientTape() as tape:
+            y_pred = self(x, training=True)  # Forward pass
+            # Compute the loss value
+            # (the loss function is configured in `compile()`)
+            loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
+
+        # Compute gradients
+        trainable_vars = self.trainable_variables
+        gradients = tape.gradient(loss, trainable_vars)
+        # Update weights
+        print('ohhhhh')
+        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+        print('ehhhhh')
+        # Update metrics (includes the metric that tracks the loss)
+        self.compiled_metrics.update_state(y, y_pred)
+        print('asdasdsadasdsads')
+        # Return a asdasd mapping metric names to current value
+        return {m.name: m.result() for m in self.metrics}
+
 
 class Model():
     """Base class for all models"""

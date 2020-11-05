@@ -25,7 +25,7 @@ class IntegrateLayer(tf.keras.layers.Layer):
         return config
 
 
-class ContinuousConv1D(tf.python.keras.layers.convolutional.Conv1D):
+class Continuous1DConvV1(tf.python.keras.layers.convolutional.Conv1D):
     """
     Arguments:
         filters: Integer, the dimensionality of the output space

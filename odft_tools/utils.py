@@ -53,7 +53,7 @@ def second_derivative_matrix(G, h, method='three_point'):
     mat /= h**2    
     return mat
 
-def gen_gaussian_kernel1D(shape, mean, stddev, dtype=dtypes.float32):
+def gen_gaussian_kernel_v1_1D(shape, mean, stddev, dtype=dtypes.float32):
     """ Returns a tensor object cotnaining gaussian kernels
     Args:
       shape: Shape of the tensor.

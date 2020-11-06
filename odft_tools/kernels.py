@@ -19,6 +19,12 @@ class GaussianKernel1D(Initializer):
                  weights_init=None,
                  stddev=1.0):
 
+        if isinstance(weights_init, list):
+            raise TypeError("weights_init must be a list")
+
+        if len(weights_init) not 2:
+            raise ValueError("weights_init length must be 2")
+
         if weights_init[0] < 0:
             raise ValueError("'mean' must be positive float")
 

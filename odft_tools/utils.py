@@ -57,8 +57,7 @@ def gen_gaussian_kernel1D(shape, weights, dtype=dtypes.float32):
     """ Returns a tensor object cotnaining gaussian kernels
     Args:
       shape: Shape of the tensor.
-      mean: mean of gaussian
-      stddev: stddev of gaussian
+      weights: mean and stddev of gaussian
       dtype: Optional dtype of the tensor. Only floating point types are
          supported.
     """ 

@@ -16,12 +16,23 @@ from tensorflow.python.keras.engine import base_layer
 from tensorflow.python.eager import monitoring
 
 
-class CuntModel(keras.Model):
+class CostumCNNModel(keras.Model):
     def __init__(self, input_shape, weights, n_outputs):
         super(CuntModel, self).__init__()
-        self.layer1 = ContinuousConv1D(filters=64, kernel_size=60, activation='relu', input_shape=input_shape, weights_init=weights)
+        self.layer1 = ContinuousConv1D(
+            filters=64,
+            kernel_size=60,
+            activation='relu',
+            input_shape=input_shape,
+            weights_init=weights
+        )
 
-        self.layer2 = ContinuousConv1D(filters=64, kernel_size=60, activation='relu', weights_init=[0, 0.05])
+        self.layer2 = ContinuousConv1D(
+            filters=64,
+            kernel_size=60,
+            activation='relu',
+            weights_init=[0, 0.05]
+        )
         self.layer3 = Dropout(0.5)
         self.layer4 = MaxPooling1D(pool_size=2)
         self.layer5 = Flatten()
@@ -54,12 +65,9 @@ class CuntModel(keras.Model):
         trainable_vars = self.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)
         # Update weights
-        print('ohhhhh')
         self.optimizer.apply_gradients(zip(gradients, trainable_vars))
-        print('ehhhhh')
         # Update metrics (includes the metric that tracks the loss)
         self.compiled_metrics.update_state(y, y_pred)
-        print('asdasdsadasdsads')
         # Return a asdasd mapping metric names to current value
         return {m.name: m.result() for m in self.metrics}
 

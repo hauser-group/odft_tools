@@ -53,7 +53,7 @@ def second_derivative_matrix(G, h, method='three_point'):
     mat /= h**2    
     return mat
 
-def gen_gaussian_kernel1D(shape, weights, dtype=dtypes.float32):
+def gen_gaussian_kernel_v2_1D(shape, weights, dtype=dtypes.float32):
     """ Returns a tensor object cotnaining gaussian kernels
     Args:
       shape: Shape of the tensor.
@@ -68,7 +68,7 @@ def gen_gaussian_kernel1D(shape, weights, dtype=dtypes.float32):
     input_size = shape[1]
     filter_size = shape[2]
 
-    gaus_kerne_count =  input_size * filter_size
+    gaus_kernel_count =  input_size * filter_size
 
     truncate = kernel_size/2
 
@@ -87,13 +87,11 @@ def gen_gaussian_kernel1D(shape, weights, dtype=dtypes.float32):
     left_cut = center - int(kernel_size/2)
     right_cut = center + int(kernel_size/2)
 
-    for i in tf.range(gaus_kerne_count):
+    for i in tf.range(gaus_kernel_count):
         mean = means[i]
         stddev = stddevs[i]
         gauss_kernel = tf.math.exp(-((support - mean) ** 2)/(2*stddev ** 2))
-        gauss_kernel = gauss_kernel / tf.math.reduce_sum(gauss_kernel)
-        # gauss_kernel = gauss_kernel / gauss_kernel.sum()
-        
+        gauss_kernel = gauss_kernel / tf.math.reduce_sum(gauss_kernel)        
 
         if (kernel_size % 2) != 0:
             gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 2]
@@ -113,6 +111,59 @@ def gen_gaussian_kernel1D(shape, weights, dtype=dtypes.float32):
         )
       )
     )
+
+    gauss_kernels = tf.convert_to_tensor(
+        value=gauss_kernels,
+        dtype=dtype)
+    return gauss_kernels
+
+def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32):
+    """ Returns a tensor object cotnaining gaussian kernels
+    Args:
+      shape: Shape of the tensor.
+      mean: mean of gaussian
+      stddev: stddev of gaussian
+      dtype: Optional dtype of the tensor. Only floating point types are
+         supported.
+    """ 
+    mean = weights[0]
+    stddev = weights[1]
+    kernel_size = shape[0]
+    input_size = shape[1]
+    filter_size = shape[2]
+
+    gaus_kernel_count =  input_size * filter_size
+
+    truncate = kernel_size/2
+
+    width = int(truncate + 0.5)
+    # width = int(truncate * stddev + 0.5)
+    support = np.arange(-width, width + 1)
+    
+    gauss_kernels = []
+
+
+    center = int(len(support)/2)
+    left_cut = center - int(kernel_size/2)
+    right_cut = center + int(kernel_size/2)
+
+    for i in range(gaus_kernel_count):
+        gauss_kernel = np.exp(-((support - mean) ** 2)/(2*stddev ** 2))
+        gauss_kernel = gauss_kernel / gauss_kernel.sum()
+
+        if (kernel_size % 2) != 0:
+            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 2]
+        else:
+            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 1]
+        gauss_kernels.append(gauss_kernel)
+
+    gauss_kernels = np.reshape(
+      gauss_kernels, (
+        filter_size,
+        input_size,
+        kernel_size
+        ) 
+      ).T
 
     gauss_kernels = tf.convert_to_tensor(
         value=gauss_kernels,

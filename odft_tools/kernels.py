@@ -1,4 +1,7 @@
-from odft_tools.utils import gen_gaussian_kernel1D
+from odft_tools.utils import (
+    gen_gaussian_kernel_v1_1D,
+    gen_gaussian_kernel_v2_1D
+)
 
 from tensorflow.python.ops.init_ops_v2 import (
     Initializer,
@@ -14,15 +17,12 @@ import numpy as np
 import math
 
 
-class GaussianKernel1D(Initializer):
+class GaussianKernel1DV1(Initializer):
     def __init__(self,
-                 weights_init=None,
+                 weights_init,
                  stddev=1.0):
 
-        if isinstance(weights_init, list):
-            raise TypeError("weights_init must be a list")
-
-        if len(weights_init) not 2:
+        if len(weights_init) != 2:
             raise ValueError("weights_init length must be 2")
 
         if weights_init[0] < 0:
@@ -30,7 +30,6 @@ class GaussianKernel1D(Initializer):
 
         if weights_init[1] < 0:
             raise ValueError("'stddev' must be positive float")
-
 
         self.weights_init = weights_init
 
@@ -45,17 +44,9 @@ class GaussianKernel1D(Initializer):
         """
 
         dtype = _assert_float_dtype(dtype)
-
-        mean = [[self.weights_init[0]] * shape[2]] * shape[1]
-        stddev = [[self.weights_init[1]] * shape[2]] * shape[1]
-
-        weights_init = tf.concat([[mean, stddev]], 0)
-        shape_weights = (2, shape[1], shape[2])
-
-        weights_init = tf.reshape(weights_init, shape_weights, name=None)
-        gauss_kernel = gen_gaussian_kernel1D(
+        gauss_kernel = gen_gaussian_kernel_v1_1D(
             shape=shape,
-            weights=weights_init,
+            weights=self.weights_init,
             dtype=dtype)
         return gauss_kernel
 
@@ -66,23 +57,35 @@ class GaussianKernel1D(Initializer):
         }
 
 
-class GaussianKernel1DWeights(Initializer):
+class GaussianKernel1DV2(Initializer):
     """docstring for GaussianKernel1DWeights"""
     def __init__(self,
-                 weights_init=None,
+                 weights_init,
                  seed=None,
                  scale=1.0,
                  mode="fan",
                  distribution="truncated_normal"):
 
+        if len(weights_init) != 2:
+            raise ValueError("weights_init length must be 2")
+
+        if weights_init[0] < 0:
+            raise ValueError("'mean' must be positive float")
+
+        if weights_init[1] < 0:
+            raise ValueError("'stddev' must be positive float")
+
         if scale <= 0.:
             raise ValueError("`scale` must be positive float.")
+
         if mode not in {"fan", "fan_out", "fan_avg"}:
             raise ValueError("Invalid `mode` argument:", mode)
+
         distribution = distribution.lower()
         # Compatibility with keras-team/keras.
         if distribution == "normal":
             distribution = "truncated_normal"
+
         if distribution not in {"uniform", "truncated_normal",
                                 "untruncated_normal"}:
             raise ValueError("Invalid `distribution` argument:", distribution)
@@ -150,8 +153,8 @@ class GaussianKernel1DWeights(Initializer):
 
     def get_config(self):
         return {
-            "mean": self.mean,
-            "stddev": self.stddev,
+            "mean": self.weights_init[0],
+            "stddev": self.weights_init[1],
             "scale": self.scale,
             "mode": self.mode,
             "distribution": self.distribution,

@@ -135,7 +135,7 @@ class Continuous1DConvV2(tf.python.keras.layers.convolutional.Conv1D):
             weights=self.weights_gausian
         )
         outputs = self._convolution_op(inputs, gaussian_weights_kernel)
-
+        
         if self.use_bias:
             output_rank = outputs.shape.rank
         if self.rank == 1 and self._channels_first:

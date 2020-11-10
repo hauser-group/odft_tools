@@ -60,7 +60,7 @@ def gen_gaussian_kernel_v2_1D(shape, weights, dtype=dtypes.float32):
       weights: mean and stddev of gaussian
       dtype: Optional dtype of the tensor. Only floating point types are
          supported.
-    """ 
+    """
     means = tf.reshape(weights[0, :, :], [-1])
     stddevs = tf.reshape(weights[1, :, :], [-1])
 
@@ -89,7 +89,7 @@ def gen_gaussian_kernel_v2_1D(shape, weights, dtype=dtypes.float32):
 
     for i in tf.range(gaus_kernel_count):
         mean = means[i]
-        stddev = stddevs[i]
+        stddev = stddevs[i]        
         gauss_kernel = tf.math.exp(-((support - mean) ** 2)/(2*stddev ** 2))
         gauss_kernel = gauss_kernel / tf.math.reduce_sum(gauss_kernel)        
 
@@ -98,7 +98,6 @@ def gen_gaussian_kernel_v2_1D(shape, weights, dtype=dtypes.float32):
         else:
             gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 1]
         gauss_kernels = gauss_kernels.write(gauss_kernels.size(), gauss_kernel)
-
 
     gauss_kernels = gauss_kernels.stack()
     gauss_kernels = tf.transpose(
@@ -141,7 +140,6 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32):
     support = np.arange(-width, width + 1)
     
     gauss_kernels = []
-
 
     center = int(len(support)/2)
     left_cut = center - int(kernel_size/2)

@@ -1,5 +1,7 @@
+import numba
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from tensorflow.python.framework import dtypes
 
@@ -63,7 +65,9 @@ def gen_gaussian_kernel_v2_1D(shape, weights, dtype=dtypes.float32):
     """
     means = tf.reshape(weights[0, :, :], [-1])
     stddevs = tf.reshape(weights[1, :, :], [-1])
-
+    
+    means = means
+    stddevs = stddevs
     kernel_size = shape[0]
     input_size = shape[1]
     filter_size = shape[2]
@@ -73,8 +77,7 @@ def gen_gaussian_kernel_v2_1D(shape, weights, dtype=dtypes.float32):
     truncate = kernel_size/2
 
     width = int(truncate + 0.5)
-    # width = int(truncate * stddev + 0.5)
-    # width = truncate
+
     support = tf.convert_to_tensor(
       value=np.arange(-width, width + 1),
       dtype=dtype
@@ -89,7 +92,7 @@ def gen_gaussian_kernel_v2_1D(shape, weights, dtype=dtypes.float32):
 
     for i in tf.range(gaus_kernel_count):
         mean = means[i]
-        stddev = stddevs[i]        
+        stddev = stddevs[i]
         gauss_kernel = tf.math.exp(-((support - mean) ** 2)/(2*stddev ** 2))
         gauss_kernel = gauss_kernel / tf.math.reduce_sum(gauss_kernel)        
 
@@ -116,6 +119,38 @@ def gen_gaussian_kernel_v2_1D(shape, weights, dtype=dtypes.float32):
         dtype=dtype)
     return gauss_kernels
 
+signature = (
+    numba.int64[:],
+    numba.int64,
+    numba.int64,
+    numba.float64,
+    numba.float64
+)
+
+# @numba.njit(signature)
+def calc_gaussians(support, kernel_size, gaus_kernel_count, mean, stddev):
+    gauss_kernels = []
+
+    center = int(len(support)/2)
+    left_cut = center - int(kernel_size/2)
+    right_cut = center + int(kernel_size/2)
+
+    for i in range(gaus_kernel_count):
+        gauss_kernel = np.exp(-((support - mean + np.random.normal(5, 3)) ** 2)/(2*(stddev + np.random.normal(5, 3)) ** 2))
+        
+        # if (i == 0) or (i == (gaus_kernel_count - 1)):
+        #     gauss_kernel = np.exp(-((support - mean + np.random.normal(5, 3)) ** 2)/(2*(stddev + np.random.normal(5, 3)) ** 2))
+        #     # gauss_kernel = gauss_kernel / gauss_kernel.sum()
+        # else:
+        #     gauss_kernel = np.random.uniform(size=len(support))
+        gauss_kernel = gauss_kernel / gauss_kernel.sum()
+        if (kernel_size % 2) != 0:
+            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 2]
+        else:
+            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 1]
+        gauss_kernels.append(gauss_kernel)
+    return gauss_kernels
+
 def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32):
     """ Returns a tensor object cotnaining gaussian kernels
     Args:
@@ -139,21 +174,7 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32):
     # width = int(truncate * stddev + 0.5)
     support = np.arange(-width, width + 1)
     
-    gauss_kernels = []
-
-    center = int(len(support)/2)
-    left_cut = center - int(kernel_size/2)
-    right_cut = center + int(kernel_size/2)
-
-    for i in range(gaus_kernel_count):
-        gauss_kernel = np.exp(-((support - mean) ** 2)/(2*stddev ** 2))
-        gauss_kernel = gauss_kernel / gauss_kernel.sum()
-
-        if (kernel_size % 2) != 0:
-            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 2]
-        else:
-            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 1]
-        gauss_kernels.append(gauss_kernel)
+    gauss_kernels = calc_gaussians(support, kernel_size, gaus_kernel_count, mean, stddev)
 
     gauss_kernels = np.reshape(
       gauss_kernels, (
@@ -166,4 +187,5 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32):
     gauss_kernels = tf.convert_to_tensor(
         value=gauss_kernels,
         dtype=dtype)
+
     return gauss_kernels

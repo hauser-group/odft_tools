@@ -137,8 +137,9 @@ class GaussianKernel1DV2(Initializer):
         else:
             stddev = tf.convert_to_tensor(
                 value=[[stddev] * shape_weight[1]] * shape_weight[2], 
-                dtype=dtype
+                dtype=dtype  
             )
+            stddev = stddev + tf.random.normal(shape=tf.shape(stddev), mean=9, stddev=4)
         if mean is None:
             mean = self._random_generator.random_uniform(shape_weight, 0, limit, dtype)
         else:
@@ -146,7 +147,7 @@ class GaussianKernel1DV2(Initializer):
                 value=[[mean] * shape_weight[1]] * shape_weight[2], 
                 dtype=dtype
             )
-
+            mean = mean + tf.random.normal(shape=tf.shape(mean), mean=5, stddev=4)
         weights = tf.concat([[mean, stddev]], 0)
         weights = tf.reshape(weights, shape, name=None)
         return weights

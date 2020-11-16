@@ -49,9 +49,6 @@ class Continuous1DConvV2(tf.python.keras.layers.convolutional.Conv1D):
         super().__init__(**kwargs)
 
         self.weights_init = weights_init
-        self.kernel_initializer = GaussianKernel1DV2(
-            weights_init=self.weights_init
-        )
         self.kernel_shape = None
 
         self.gaussian_weights_initializer = GaussianKernel1DV2(

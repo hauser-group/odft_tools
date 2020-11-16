@@ -18,7 +18,7 @@ from tensorflow.python.eager import monitoring
 
 class CostumCNNModel(keras.Model):
     def __init__(self, input_shape, weights, n_outputs):
-        super(CuntModel, self).__init__()
+        super(CostumCNNModel, self).__init__()
         self.layer1 = ContinuousConv1D(
             filters=64,
             kernel_size=60,

@@ -2,7 +2,8 @@ import numpy as np
 import unittest
 from odft_tools.kernels import RBFKernel
 from odft_tools.cython_kernels import RBFKernel as RBFKernel_cy
-from odft_tools.modular_cython_kernels import RBFKernel as RBFKernel_mod_cy
+from odft_tools.memview_cython_kernels import RBFKernel as RBFKernel_memview_cy
+from odft_tools.pointer_cython_kernels import RBFKernel as RBFKernel_pointer_cy
 
 class KernelTest():
     class KernelTest(unittest.TestCase):
@@ -197,8 +198,12 @@ class CythonRBFKernelTest(KernelTest.KernelTest):
     kernel = RBFKernel_cy(length_scale=2.2, scale=1.2, constant=0.6)
     n_dim = 15
     
-class ModularCythonRBFKernelTest(KernelTest.KernelTest):
-    kernel = RBFKernel_mod_cy(length_scale=2.2, scale=1.2, constant=0.6)
+class MemviewCythonRBFKernelTest(KernelTest.KernelTest):
+    kernel = RBFKernel_memview_cy(length_scale=2.2, scale=1.2, constant=0.6)
+    n_dim = 15
+
+class PointerCythonRBFKernelTest(KernelTest.KernelTest):
+    kernel = RBFKernel_pointer_cy(length_scale=2.2, scale=1.2, constant=0.6)
     n_dim = 15
     
 if __name__ == '__main__':

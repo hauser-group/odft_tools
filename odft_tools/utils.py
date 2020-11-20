@@ -79,10 +79,13 @@ def gen_gaussian_kernel_v2_1D(shape, weights, dtype=dtypes.float32):
     width = int(truncate + 0.5)
 
     support = tf.convert_to_tensor(
-      value=np.arange(-width, width + 1),
+      value=np.arange(
+          -width - int(kernel_size/2),
+          width + 1 + int(kernel_size/2)
+          ),
       dtype=dtype
     )
-    
+
     gauss_kernels = tf.TensorArray(dtype, size=0, dynamic_size=True)
 
 
@@ -128,30 +131,38 @@ signature = (
 )
 
 # @numba.njit(signature)
-def calc_gaussians(support, kernel_size, gaus_kernel_count, mean, stddev):
+def calc_gaussians(kernel_size, gaus_kernel_count, means, stddevs, random_init):
     gauss_kernels = []
 
-    center = int(len(support)/2)
-    left_cut = center - int(kernel_size/2)
-    right_cut = center + int(kernel_size/2)
+    truncate = kernel_size/2
+
+    width = int(truncate + 0.5)
 
     for i in range(gaus_kernel_count):
-        gauss_kernel = np.exp(-((support - mean + np.random.normal(5, 3)) ** 2)/(2*(stddev + np.random.normal(5, 3)) ** 2))
-        
-        # if (i == 0) or (i == (gaus_kernel_count - 1)):
-        #     gauss_kernel = np.exp(-((support - mean + np.random.normal(5, 3)) ** 2)/(2*(stddev + np.random.normal(5, 3)) ** 2))
-        #     # gauss_kernel = gauss_kernel / gauss_kernel.sum()
-        # else:
-        #     gauss_kernel = np.random.uniform(size=len(support))
+        if random_init:
+            shift_gaussian = np.random.randint(-kernel_size/4, kernel_size/4)
+        else:
+            shift_gaussian = 0
+        support = np.arange(
+            -width - shift_gaussian,
+            width + 1 - shift_gaussian)
+
+        center = int(len(support)/2)
+        left_cut = center - int(kernel_size/2)
+        right_cut = center + int(kernel_size/2)
+
+        gauss_kernel = np.exp(-((support - means[i]) ** 2)/(2*(stddevs[i]) ** 2))
         gauss_kernel = gauss_kernel / gauss_kernel.sum()
+
         if (kernel_size % 2) != 0:
             gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 2]
         else:
             gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 1]
+
         gauss_kernels.append(gauss_kernel)
     return gauss_kernels
 
-def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32):
+def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=False):
     """ Returns a tensor object cotnaining gaussian kernels
     Args:
       shape: Shape of the tensor.
@@ -168,13 +179,42 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32):
 
     gaus_kernel_count =  input_size * filter_size
 
-    truncate = kernel_size/2
+    # Distribute unoform means and stddev 
+    # lenght is kernel size times input size
+    if random_init:
+        means = np.random.uniform(
+            low=0.0,
+            high=mean * 2,
+            size=gaus_kernel_count
+        )
+        stddevs = np.random.uniform(
+            low=stddev,
+            high=stddev * 2,
+            size=gaus_kernel_count
+        )
+    else:
+        # Distribute means and stddevs around given mean and stddev
+        # random uniform
+        means = [mean] * gaus_kernel_count + np.random.uniform(
+            low=-mean / 2,
+            high=mean / 2,
+            size=gaus_kernel_count
+        )
 
-    width = int(truncate + 0.5)
-    # width = int(truncate * stddev + 0.5)
-    support = np.arange(-width, width + 1)
-    
-    gauss_kernels = calc_gaussians(support, kernel_size, gaus_kernel_count, mean, stddev)
+        stddevs = [stddev] * gaus_kernel_count + np.random.uniform(
+            low=-stddev / 2,
+            high=stddev / 2,
+            size=gaus_kernel_count
+        )
+
+    # calc gaussian kernel
+    gauss_kernels = calc_gaussians(
+        kernel_size,
+        gaus_kernel_count,
+        means,
+        stddevs,
+        random_init
+    )
 
     gauss_kernels = np.reshape(
       gauss_kernels, (

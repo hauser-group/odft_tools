@@ -18,10 +18,12 @@ import math
 
 
 class GaussianKernel1DV1(Initializer):
+    # Costum Kernel for gaussian dist.
     def __init__(self,
                  weights_init,
-                 stddev=1.0):
+                 random_init=False):
 
+        # check vatiables
         if len(weights_init) != 2:
             raise ValueError("weights_init length must be 2")
 
@@ -32,8 +34,10 @@ class GaussianKernel1DV1(Initializer):
             raise ValueError("'stddev' must be positive float")
 
         self.weights_init = weights_init
+        self.random_init = random_init
 
     def __call__(self, shape, dtype=dtypes.float32):
+        # Here we the gaussian kernel is set
         """Returns a tensor object initialized as specified by the initializer.
         Args:
           shape: Shape of the tensor.
@@ -44,16 +48,19 @@ class GaussianKernel1DV1(Initializer):
         """
 
         dtype = _assert_float_dtype(dtype)
+        # Calc gaussian kernel
         gauss_kernel = gen_gaussian_kernel_v1_1D(
             shape=shape,
             weights=self.weights_init,
-            dtype=dtype)
+            dtype=dtype,
+            random_init=self.random_init)
         return gauss_kernel
 
     def get_config(self):
         return {
             "mean": self.weights_init[0],
-            "stddev": self.weights_init[1]
+            "stddev": self.weights_init[1],
+            "raondom_init": self.random_init
         }
 
 
@@ -61,19 +68,14 @@ class GaussianKernel1DV2(Initializer):
     """docstring for GaussianKernel1DWeights"""
     def __init__(self,
                  weights_init,
+                 random_init=False,
                  seed=None,
                  scale=1.0,
                  mode="fan",
                  distribution="truncated_normal"):
-
+        # check vatiables
         if len(weights_init) != 2:
             raise ValueError("weights_init length must be 2")
-
-        if weights_init[0] < 0:
-            raise ValueError("'mean' must be positive float")
-
-        if weights_init[1] < 0:
-            raise ValueError("'stddev' must be positive float")
 
         if scale <= 0.:
             raise ValueError("`scale` must be positive float.")
@@ -93,8 +95,9 @@ class GaussianKernel1DV2(Initializer):
         self.seed = seed
         self._random_generator = _RandomGenerator(seed)
         self.weights_init = weights_init
+        self.random_init = random_init
         self.mode = mode
-        self.distribution = 'untruncated_normal'#distribution
+        self.distribution = 'untruncated_normal'
         self.mode = mode
         self.scale = scale
 
@@ -132,23 +135,25 @@ class GaussianKernel1DV2(Initializer):
         shape_weight = (int(shape[0]/2), shape[1], shape[2])
 
         limit = math.sqrt(3.0 * scale)
-        if stddev is None:
-            stddev = self._random_generator.random_uniform(shape_weight, 0, limit, dtype)
+
+        # 1. Option. Distribute radom uniform with scale --> limit as limit
+        # 2. Option. Distribute random uniform around given mean and stddev
+        if self.random_init:
+            stddevs = self._random_generator.random_uniform(shape_weight, 0, mean * 2, dtype)
+            means = self._random_generator.random_uniform(shape_weight, 0, stddev * 2, dtype)
         else:
-            stddev = tf.convert_to_tensor(
-                value=[[stddev] * shape_weight[1]] * shape_weight[2], 
-                dtype=dtype  
-            )
-            stddev = stddev + tf.random.normal(shape=tf.shape(stddev), mean=9, stddev=4)
-        if mean is None:
-            mean = self._random_generator.random_uniform(shape_weight, 0, limit, dtype)
-        else:
-            mean = tf.convert_to_tensor(
-                value=[[mean] * shape_weight[1]] * shape_weight[2], 
-                dtype=dtype
-            )
-            mean = mean + tf.random.normal(shape=tf.shape(mean), mean=5, stddev=4)
-        weights = tf.concat([[mean, stddev]], 0)
+            stddevs = self._random_generator.random_uniform(
+                shape_weight,
+                -mean / 2,
+                mean / 2,
+                dtype)
+
+            means = self._random_generator.random_uniform(
+                shape_weight,
+                -stddev / 2, stddev / 2,
+                dtype)
+
+        weights = tf.concat([[means, stddevs]], 0)
         weights = tf.reshape(weights, shape, name=None)
         return weights
 

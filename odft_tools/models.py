@@ -7,7 +7,10 @@ from odft_tools.kernels import RBFKernel
 from odft_tools.utils import (first_derivative_matrix,
                               second_derivative_matrix,
                               integrate)
-from odft_tools.layers import ContinuousConv1D
+from odft_tools.layers import (
+    Continuous1DConvV1,
+    IntegrateLayer
+)
 from keras.layers.convolutional import MaxPooling1D
 from keras.layers import Dropout
 from keras.layers import Flatten
@@ -16,60 +19,189 @@ from tensorflow.python.keras.engine import base_layer
 from tensorflow.python.eager import monitoring
 
 
-class CostumCNNModel(keras.Model):
-    def __init__(self, input_shape, weights, n_outputs):
-        super(CostumCNNModel, self).__init__()
-        self.layer1 = ContinuousConv1D(
-            filters=64,
-            kernel_size=60,
-            activation='relu',
-            input_shape=input_shape,
-            weights_init=weights
-        )
+class ResNetConv1DModel(keras.Model):
+    def __init__(
+            self,
+            filter_size,
+            kernel_size,
+            layer_size,
+            num_res_nat_blocks,
+            n_outputs,
+            dx=1.0):
 
-        self.layer2 = ContinuousConv1D(
-            filters=64,
-            kernel_size=60,
-            activation='relu',
-            weights_init=[0, 0.05]
-        )
-        self.layer3 = Dropout(0.5)
-        self.layer4 = MaxPooling1D(pool_size=2)
-        self.layer5 = Flatten()
-        self.layer6 = Dense(100, activation='relu')
-        self.layer7 = Dense(n_outputs, activation='softmax')
+        super(ResNetConv1DModel, self).__init__()
+        self.filter_size = filter_size
+        self.kernel_size = kernel_size
+        self.layer_size = layer_size
+        self.num_res_nat_blocks = num_res_nat_blocks
+        self.n_outputs = n_outputs
+        self.dx = dx
+        self.conv_layers = []
+
+    def construct_layers_res_net(self):
+        for l in range(self.num_res_nat_blocks):
+            layer_with_act = tf.keras.layers.Conv1D(
+                filters=self.filter_size,
+                kernel_size=self.kernel_size,
+                   activation='softplus',
+                padding='same'
+            )
+
+            self.conv_layers.append(layer_with_act)
+            # res_net layer for '+ x'
+            layer_without_act = tf.keras.layers.Conv1D(
+                filters=self.filter_size,
+                kernel_size=self.kernel_size,
+                activation=None,
+                padding='same'
+            )
+
+            self.conv_layers.append(layer_without_act)
+        # last layer is fixed to use a single filter
+        layer = tf.keras.layers.Conv1D(
+                filters=1,
+                kernel_size=self.kernel_size,
+                activation=None,
+                padding='same'
+            )
+        self.conv_layers.append(layer)
+        self.integrate = IntegrateLayer(self.dx)
 
     def call(self, inputs):
-        x = self.layer1(inputs)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        x = self.layer5(x)
-        x = self.layer6(x)
-        x = self.layer7(x)
-
-        return x
-
-    def train_step(self, data):
-        # Unpack the data. Its structure depends on your model and
-        # on what you pass to `fit()`.
-        x, y = data
-
         with tf.GradientTape() as tape:
-            y_pred = self(x, training=True)  # Forward pass
-            # Compute the loss value
-            # (the loss function is configured in `compile()`)
-            loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
+            tape.watch(inputs)
+            # Calculate kinetic energy density tau by applying convolutional layers
+            tau = inputs
+            for i, layer in enumerate(self.conv_layers):
+                tau = layer(tau)
+                # apply F(x) + x to layer without act. fun
+                if (i > 0) and (i % 2 == 0) and (i < len(self.conv_layers) - 1):
+                    tau = tf.keras.layers.Add()([tau, inputs])
+                    tau = tf.keras.layers.Activation('softplus')(tau)
+            # Kinetic energy T is integral over kinetiv energy density
+            T = self.integrate(tau)
+        # The discretized derivative needs to be divided by dx
+        dT_dn = tape.gradient(T, inputs)/self.dx
+        return {'T': T, 'dT_dn': dT_dn}
 
-        # Compute gradients
-        trainable_vars = self.trainable_variables
-        gradients = tape.gradient(loss, trainable_vars)
-        # Update weights
-        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
-        # Update metrics (includes the metric that tracks the loss)
-        self.compiled_metrics.update_state(y, y_pred)
-        # Return a asdasd mapping metric names to current value
-        return {m.name: m.result() for m in self.metrics}
+
+class ResNetContConv1DModel(ResNetConv1DModel):
+    def __init__(
+            self,
+            weights_gaus,
+            random_init=True,
+            **kwargs):
+        # super(ResNetContConv1DModel, self).__init__()
+        super().__init__(**kwargs)
+
+        self.weights_gaus = weights_gaus
+        self.random_init = random_init
+        self.conv_layers = []
+
+    def construct_layers_res_net(self):
+        for l in range(self.num_res_nat_blocks):
+            if l == 0:
+                layer_with_act = Continuous1DConvV1(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation='softplus',
+                    padding='same',
+                    weights_init=self.weights_gaus,
+                    random_init=self.random_init
+                )
+            else:
+                layer_with_act = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation='softplus',
+                    padding='same'
+                )
+            self.conv_layers.append(layer_with_act)
+
+            layer_without_act = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same'
+                )
+
+            self.conv_layers.append(layer_without_act)
+
+        # last layer is fixed to use a single filter
+        layer = tf.keras.layers.Conv1D(
+                filters=1,
+                kernel_size=self.kernel_size,
+                activation='linear',
+                padding='same'
+            )
+        self.conv_layers.append(layer)
+        self.integrate = IntegrateLayer(self.dx)
+
+
+class ResNetContConv1DModelV2(ResNetConv1DModel):
+    def __init__(
+            self,
+            weights_gaus,
+            random_init=True,
+            **kwargs):
+        # super(ResNetContConv1DModel, self).__init__()
+        super().__init__(**kwargs)
+
+        self.weights_gaus = weights_gaus
+        self.random_init = random_init
+        self.conv_layers = []
+
+    def construct_layers_res_net(self):
+
+        layer_with_act = Continuous1DConvV1(
+            filters=self.filter_size,
+            kernel_size=self.kernel_size,
+            activation='softplus',
+            padding='same',
+            weights_init=self.weights_gaus,
+            random_init=self.random_init
+        )
+
+        self.conv_layers.append(layer_with_act)
+
+        layer_without_act = Continuous1DConvV1(
+            filters=self.filter_size,
+            kernel_size=self.kernel_size,
+            activation=None,
+            padding='same',
+            weights_init=self.weights_gaus,
+            random_init=self.random_init
+        )
+        
+        self.conv_layers.append(layer_without_act)
+
+        for l in range(self.num_res_nat_blocks - 1):
+            layer_with_act = tf.keras.layers.Conv1D(
+                filters=self.filter_size,
+                kernel_size=self.kernel_size,
+                activation='softplus',
+                padding='same'
+            )
+            self.conv_layers.append(layer_with_act)
+
+            layer_without_act = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same'
+                )
+
+            self.conv_layers.append(layer_without_act)
+
+        # last layer is fixed to use a single filter
+        layer = tf.keras.layers.Conv1D(
+                filters=1,
+                kernel_size=self.kernel_size,
+                activation='linear',
+                padding='same'
+            )
+        self.conv_layers.append(layer)
+        self.integrate = IntegrateLayer(self.dx)
 
 
 class Model():

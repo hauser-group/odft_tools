@@ -21,7 +21,8 @@ class GaussianKernel1DV1(Initializer):
     # Costum Kernel for gaussian dist.
     def __init__(self,
                  weights_init,
-                 random_init=False):
+                 random_init=False,
+                 seed=None):
 
         # check vatiables
         if len(weights_init) != 2:

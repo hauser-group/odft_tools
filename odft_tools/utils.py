@@ -1,3 +1,4 @@
+import os
 import numba
 import numpy as np
 import tensorflow as tf
@@ -229,3 +230,48 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=
         dtype=dtype)
 
     return gauss_kernels
+
+
+def plot_gaussian_weights_v1(weights, result_type, before_after):
+    # if not os.path.exists('results' + result_type):
+    #     os.makedirs('results' + result_type)
+    plt.ylabel('density')
+    plt.xlabel('kernel size')
+    plt.title('Gaussian Kernel of ContConv1V1 with Layer softplus act. fun ' + before_after)
+    plt.plot(weights[:, 0, :])
+    plt.show()
+
+def plot_gaussian_weights_v2(weights, mean, stddev, kernel_size, before_after):
+    truncate = kernel_size/2
+
+    width = int(truncate + 0.5)
+    support = np.arange(-width, width + 1)
+    center = int(len(support)/2)
+
+    left_cut = center - int(kernel_size/2)
+    right_cut = center + int(kernel_size/2)
+
+    for mean, stddev in zip(weights[0][0], weights[1][0]):
+        gauss_kernel = np.exp(-((support - mean) ** 2)/(2*stddev ** 2))
+        gauss_kernel = gauss_kernel / gauss_kernel.sum()
+
+        if (kernel_size % 2) != 0:
+            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 2]
+        else:
+            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 1]
+        plt.plot(gauss_kernel)
+    plt.ylabel('density')
+    plt.xlabel('kernel size')
+    plt.title('Gaussian Kernel of ContConv1DV2 with Layer softplus act. fun ' + before_after)
+    plt.show()
+
+def plot_derivative_energy(x, dT_dn, model, n, result_type):
+    if not os.path.exists('results' + result_type):
+        os.makedirs('results' + result_type)
+
+    plt.plot(x, dT_dn[0])
+    plt.plot(x, tf.squeeze(model(n[0].reshape((1, 500, 1)).astype(np.float32))['dT_dn']))
+    plt.ylabel('dT_dn')
+    plt.title('Comparison reference with trained')
+#    plt.savefig('results' + result_type + 'dT_dn_V1_' + before_after + '.png')
+    plt.show()

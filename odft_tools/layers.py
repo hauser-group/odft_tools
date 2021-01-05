@@ -46,16 +46,19 @@ class Continuous1DConvV2(tf.python.keras.layers.convolutional.Conv1D):
     def __init__(self,
                  weights_init,
                  random_init=False,
+                 seed=None,
                  **kwargs):
         super().__init__(**kwargs)
 
         self.weights_init = weights_init
         self.random_init = random_init
+        self.seed = seed
         self.kernel_shape = None
 
         self.gaussian_weights_initializer = GaussianKernel1DV2(
             weights_init=self.weights_init,
-            random_init=self.random_init
+            random_init=self.random_init,
+            seed=self.seed
         )
 
         self.gaussian_weights_shape = None
@@ -63,7 +66,7 @@ class Continuous1DConvV2(tf.python.keras.layers.convolutional.Conv1D):
         self.gaussian_weights_constraint = None
 
 
-    def build(self, input_shape):
+    def build(self, input_shape, **kwargs):
         input_shape = tensor_shape.TensorShape(input_shape)
         input_channel = self._get_input_channel(input_shape)
         if input_channel % self.groups != 0:
@@ -80,7 +83,7 @@ class Continuous1DConvV2(tf.python.keras.layers.convolutional.Conv1D):
         self.gaussian_weights_shape = (2, ) + (input_channel // self.groups,
                                            self.filters)
 
-        # means and stddevs are here the weigths to be trained
+        # means and stddevs are here the weights to be trained
         self.weights_gausian = self.add_weight(
             name='gaussian_weights',
             shape=self.gaussian_weights_shape,
@@ -182,13 +185,16 @@ class Continuous1DConvV1(tf.python.keras.layers.convolutional.Conv1D):
     def __init__(self,
                  weights_init,
                  random_init=False,
+                 seed=None,
                  **kwargs):
         super().__init__(**kwargs)
 
         self.weights_init = weights_init
         self.random_init = random_init
+        self.seed = seed
         # Set costum kernel init. with gaussian kernel
         self.kernel_initializer = GaussianKernel1DV1(
             weights_init=weights_init,
-            random_init=self.random_init
+            random_init=self.random_init,
+            seed=self.seed
         )

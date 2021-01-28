@@ -10,7 +10,8 @@ from odft_tools.utils import (first_derivative_matrix,
 from odft_tools.layers import (
     Continuous1DConvV1,
     Continuous1DConvV2,
-    IntegrateLayer
+    IntegrateLayer,
+    Continuous1DConv
 )
 
 from tensorflow.python.framework import dtypes
@@ -27,7 +28,7 @@ class ClassicCNN(keras.Model):
             self,
             layers=[32,],
             kernel_size=64,
-            dx=1.0):
+            dx=0.002):
 
         super(ClassicCNN, self).__init__()
         self.dx = dx
@@ -72,7 +73,7 @@ class ContCNNV1(ClassicCNN):
             self,
             layers=[32,],
             kernel_size=64,
-            dx=1.0,
+            dx=0.002,
             weights=[5, 5]):
         super().__init__()
         self.dx = dx
@@ -104,13 +105,14 @@ class ContCNNV1(ClassicCNN):
         self.integrate = IntegrateLayer(dx)
 
 
-class ContCNNV2(ClassicCNN):
+class ContCNNModel(ClassicCNN):
     def __init__(
             self,
             layers=[32,],
             kernel_size=64,
-            dx=1.0,
-            weights=[5, 5]):
+            dx=0.002,
+            weights=[5, 5, 1],
+            distribution='gaussian'):
         super().__init__()
         self.dx = dx
         self.conv_layers = []
@@ -118,24 +120,26 @@ class ContCNNV2(ClassicCNN):
         stddev = weights[1]
 
         for l in layers:
-            cont_layer = Continuous1DConvV2(
+            cont_layer = Continuous1DConv(
                    filters=32,
                    kernel_size=kernel_size,
                    activation='softplus',
                    padding='same',
                    weights_init=[mean, stddev],
-                   random_init=True
+                   random_init=True,
+                   costum_kernel_type=distribution
             )
             self.conv_layers.append(cont_layer)
             # self.conv_layers.append(cont_layer)
         # last layer is fixed to use a single filter
-        cont_layer = Continuous1DConvV2(
+        cont_layer = Continuous1DConv(
             filters=1,
             kernel_size=kernel_size,
             activation='linear',
             padding='same',
             weights_init=[mean, stddev],
-            random_init=True
+            random_init=True,
+            costum_kernel_type=distribution
         )
         self.conv_layers.append(cont_layer)
         self.integrate = IntegrateLayer(dx)

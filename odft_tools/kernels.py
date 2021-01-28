@@ -1,6 +1,5 @@
 from odft_tools.utils import (
-    gen_gaussian_kernel_v1_1D,
-    gen_gaussian_kernel_v2_1D
+    gen_gaussian_kernel_v1_1D
 )
 
 from tensorflow.python.ops.init_ops_v2 import (
@@ -65,11 +64,238 @@ class GaussianKernel1DV1(Initializer):
         }
 
 
+class Kernel1DV2(Initializer):
+    """docstring for GaussianKernel1DWeights"""
+    def __init__(self,
+                 weights_init,
+                 random_init=True,
+                 seed=None,
+                 scale=1.0,
+                 mode="fan",
+                 distribution="truncated_normal"):
+        # check vatiables
+
+        if len(weights_init) == 0:
+            raise ValueError("weights_init length is zero")
+
+        if scale <= 0.:
+            raise ValueError("`scale` must be positive float.")
+
+        if mode not in {"fan", "fan_out", "fan_avg"}:
+            raise ValueError("Invalid `mode` argument:", mode)
+
+        distribution = distribution.lower()
+        # Compatibility with keras-team/keras.
+        if distribution == "normal":
+            distribution = "truncated_normal"
+
+        if distribution not in {"uniform", "truncated_normal",
+                                "untruncated_normal", 'gaussian',
+                                'lorentz', 'voigt'}:
+            raise ValueError("Invalid `distribution` argument:", distribution)
+
+        self.seed = seed
+        self._random_generator = _RandomGenerator(seed)
+        self.weights_init = weights_init
+        self.random_init = random_init
+        self.mode = mode
+        self.distribution = distribution
+        self.mode = mode
+        self.scale = scale
+
+    def __call__(self, shape, dtype=dtypes.float32):
+        """Returns a tensor object initialized as specified by the initializer.
+        Args:
+          shape: Shape of the tensor.
+          dtype: Optional dtype of the tensor. Only floating point types are
+          supported.
+        Raises:
+          ValueError: If the dtype is not floating point
+        """
+
+        dtype = _assert_float_dtype(dtype)
+
+        partition_info = None  # Keeps logic so can be readded later if necessary
+        dtype = _assert_float_dtype(dtype)
+        scale = self.scale
+        scale_shape = shape
+
+        if partition_info is not None:
+            scale_shape = partition_info.full_shape
+
+        fan, fan_out = _compute_fans(scale_shape)
+        if self.mode == "fan":
+            scale /= max(1., fan)
+        elif self.mode == "fan_out":
+            scale /= max(1., fan_out)
+        else:
+            scale /= max(1., (fan + fan_out) / 2.)
+        
+        shape_weight = (int(shape[0]/2), shape[1], shape[2])
+
+        limit = math.sqrt(3.0 * scale)
+
+        # 1. Option. Distribute radom uniform with scale --> limit as limit
+        # 2. Option. Distribute random uniform around given mean and stddev
+        weights = []
+
+        for weight in self.weights_init:
+            if self.random_init:
+                weight_random = self._random_generator.random_uniform(
+                    shape_weight,
+                    0,
+                    weight * 2,
+                    dtype
+                )
+            else:
+                weight_random = self._random_generator.random_uniform(
+                    shape_weight,
+                    -weight / 2,
+                    weight / 2,
+                    dtype
+                )
+
+            weights.append(weight_random)
+            
+        weights = tf.concat([weights], 0)
+        weights = tf.reshape(weights, shape, name=None)
+        return weights
+
 class GaussianKernel1DV2(Initializer):
     """docstring for GaussianKernel1DWeights"""
     def __init__(self,
                  weights_init,
-                 random_init=False,
+                 random_init=True,
+                 seed=None,
+                 scale=1.0,
+                 mode="fan",
+                 distribution="truncated_normal"):
+        # check vatiables
+
+        if len(weights_init) != 3:
+            raise ValueError("weights_init length must be 3")
+
+        if scale <= 0.:
+            raise ValueError("`scale` must be positive float.")
+
+        if mode not in {"fan", "fan_out", "fan_avg"}:
+            raise ValueError("Invalid `mode` argument:", mode)
+
+        distribution = distribution.lower()
+        # Compatibility with keras-team/keras.
+        if distribution == "normal":
+            distribution = "truncated_normal"
+
+        if distribution not in {"uniform", "truncated_normal",
+                                "untruncated_normal"}:
+            raise ValueError("Invalid `distribution` argument:", distribution)
+
+        self.seed = seed
+        self._random_generator = _RandomGenerator(seed)
+        self.weights_init = weights_init
+        self.random_init = random_init
+        self.mode = mode
+        self.distribution = 'untruncated_normal'
+        self.mode = mode
+        self.scale = scale
+
+    def __call__(self, shape, dtype=dtypes.float32):
+        """Returns a tensor object initialized as specified by the initializer.
+        Args:
+          shape: Shape of the tensor.
+          dtype: Optional dtype of the tensor. Only floating point types are
+          supported.
+        Raises:
+          ValueError: If the dtype is not floating point
+        """
+        
+        mean = self.weights_init[0]
+        stddev = self.weights_init[1]
+        amp = self.weights_init[2]        
+
+        dtype = _assert_float_dtype(dtype)
+
+        partition_info = None  # Keeps logic so can be readded later if necessary
+        dtype = _assert_float_dtype(dtype)
+        scale = self.scale
+        scale_shape = shape
+
+        if partition_info is not None:
+            scale_shape = partition_info.full_shape
+
+        fan, fan_out = _compute_fans(scale_shape)
+        if self.mode == "fan":
+            scale /= max(1., fan)
+        elif self.mode == "fan_out":
+            scale /= max(1., fan_out)
+        else:
+            scale /= max(1., (fan + fan_out) / 2.)
+        
+        shape_weight = (int(shape[0]/2), shape[1], shape[2])
+
+        limit = math.sqrt(3.0 * scale)
+
+        # 1. Option. Distribute radom uniform with scale --> limit as limit
+        # 2. Option. Distribute random uniform around given mean and stddev
+        if self.random_init:
+            stddevs = self._random_generator.random_uniform(
+                shape_weight,
+                0,
+                stddev * 2,
+                dtype
+            )
+            means = self._random_generator.random_uniform(
+                shape_weight,
+                0,
+                mean * 2,
+                dtype
+            )
+
+            amps = self._random_generator.random_uniform(
+                shape_weight,
+                0,
+                1,
+                dtype
+            )
+        else:
+            stddevs = self._random_generator.random_uniform(
+                shape_weight,
+                -mean / 2,
+                mean / 2,
+                dtype)
+
+            means = self._random_generator.random_uniform(
+                shape_weight,
+                -stddev / 2, stddev / 2,
+                dtype)
+            
+            amps = self._random_generator.random_uniform(
+                shape_weight,
+                0,
+                1,
+                dtype
+            )
+
+        weights = tf.concat([[means, stddevs, amps]], 0)
+        weights = tf.reshape(weights, shape, name=None)
+        return weights
+
+    def get_config(self):
+        return {
+            "mean": self.weights_init[0],
+            "stddev": self.weights_init[1],
+            "scale": self.scale,
+            "mode": self.mode,
+            "distribution": self.distribution,
+            "seed": self.seed
+        }
+
+
+class LorentzKernel1D(Initializer):
+    """docstring for LorentzKernel1DWeights"""
+    def __init__(self,
+                 weights_init,
+                 random_init=True,
                  seed=None,
                  scale=1.0,
                  mode="fan",
@@ -111,9 +337,9 @@ class GaussianKernel1DV2(Initializer):
         Raises:
           ValueError: If the dtype is not floating point
         """
-
-        mean = self.weights_init[0]
-        stddev = self.weights_init[1]
+        
+        omega_0 = self.weights_init[0]
+        gamma = self.weights_init[1]
 
         dtype = _assert_float_dtype(dtype)
 
@@ -140,21 +366,39 @@ class GaussianKernel1DV2(Initializer):
         # 1. Option. Distribute radom uniform with scale --> limit as limit
         # 2. Option. Distribute random uniform around given mean and stddev
         if self.random_init:
-            stddevs = self._random_generator.random_uniform(shape_weight, 0, mean * 2, dtype)
-            means = self._random_generator.random_uniform(shape_weight, 0, stddev * 2, dtype)
-        else:
-            stddevs = self._random_generator.random_uniform(
+            omegas_0 = self._random_generator.random_uniform(
                 shape_weight,
-                -mean / 2,
-                mean / 2,
-                dtype)
-
-            means = self._random_generator.random_uniform(
+                0,
+                omega_0 * 2,
+                dtype
+            )
+            gammas = self._random_generator.random_uniform(
                 shape_weight,
-                -stddev / 2, stddev / 2,
-                dtype)
+                0,
+                gamma * 2,
+                dtype
+            )
 
-        weights = tf.concat([[means, stddevs]], 0)
+        # else:
+        #     stddevs = self._random_generator.random_uniform(
+        #         shape_weight,
+        #         -mean / 2,
+        #         mean / 2,
+        #         dtype)
+
+        #     means = self._random_generator.random_uniform(
+        #         shape_weight,
+        #         -stddev / 2, stddev / 2,
+        #         dtype)
+            
+        #     amps = self._random_generator.random_uniform(
+        #         shape_weight,
+        #         0,
+        #         1,
+        #         dtype
+        #     )
+
+        weights = tf.concat([[omegas_0, gammas]], 0)
         weights = tf.reshape(weights, shape, name=None)
         return weights
 

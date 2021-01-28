@@ -5,6 +5,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 from tensorflow.python.framework import dtypes
+from scipy.special import wofz
 
 def integrate(fun, h, method='trapezoidal'):
     if method == 'simple':
@@ -53,83 +54,151 @@ def second_derivative_matrix(G, h, method='three_point'):
         mat[-1, -6:] = np.flip(mat[0, :6])
     else:
         raise NotImplemented()
-    mat /= h**2    
+    mat /= h**2
+    def create_res_net_model(self):
+        dens
+    def create_res_net_model(self):
+        dens   
     return mat
 
-def gen_gaussian_kernel_v2_1D(shape, weights, dtype=dtypes.float32):
+
+def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=False):
     """ Returns a tensor object cotnaining gaussian kernels
     Args:
       shape: Shape of the tensor.
-      weights: mean and stddev of gaussian
+      mean: mean of gaussian
+      stddev: stddev of gaussian
       dtype: Optional dtype of the tensor. Only floating point types are
          supported.
-    """
-    means = tf.reshape(weights[0, :, :], [-1])
-    stddevs = tf.reshape(weights[1, :, :], [-1])
-    
-    means = means
-    stddevs = stddevs
+    """ 
+    mean = weights[0]
+    stddev = weights[1]
     kernel_size = shape[0]
     input_size = shape[1]
     filter_size = shape[2]
 
     gaus_kernel_count =  input_size * filter_size
 
-    truncate = kernel_size/2
-
-    width = int(truncate + 0.5)
-
-    support = tf.convert_to_tensor(
-      value=np.arange(
-          -width - int(kernel_size/2),
-          width + 1 + int(kernel_size/2)
-          ),
-      dtype=dtype
-    )
-
-    gauss_kernels = tf.TensorArray(dtype, size=0, dynamic_size=True)
-
-
-    center = int(len(support)/2)
-    left_cut = center - int(kernel_size/2)
-    right_cut = center + int(kernel_size/2)
-
-    for i in tf.range(gaus_kernel_count):
-        mean = means[i]
-        stddev = stddevs[i]
-        gauss_kernel = tf.math.exp(-((support - mean) ** 2)/(2*stddev ** 2))
-        gauss_kernel = gauss_kernel / tf.math.reduce_sum(gauss_kernel)        
-
-        if (kernel_size % 2) != 0:
-            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 2]
-        else:
-            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 1]
-        gauss_kernels = gauss_kernels.write(gauss_kernels.size(), gauss_kernel)
-
-    gauss_kernels = gauss_kernels.stack()
-    gauss_kernels = tf.transpose(
-      tf.reshape(
-        gauss_kernels, 
-        (
-          filter_size,
-          input_size,
-          kernel_size
+    # Distribute uniform means and stddev 
+    # lenght is kernel size times input size
+    if random_init:
+        means = np.random.uniform(
+            low=0.0,
+            high=mean * 2,
+            size=gaus_kernel_count
         )
-      )
+        stddevs = np.random.uniform(
+            low=stddev,
+            high=stddev * 2,
+            size=gaus_kernel_count
+        )
+    else:
+        # Distribute means and stddevs around given mean and stddev
+        # random uniform
+        means = [mean] * gaus_kernel_count + np.random.uniform(
+            low=-mean / 2,
+            high=mean / 2,
+            size=gaus_kernel_count
+        )
+
+        stddevs = [stddev] * gaus_kernel_count + np.random.uniform(
+            low=-stddev / 2,
+            high=stddev / 2,
+            size=gaus_kernel_count
+        )
+
+    # calc gaussian kernel
+    gauss_kernels = calc_gaussians(
+        kernel_size,
+        gaus_kernel_count,
+        means,
+        stddevs,
+        random_init
     )
+
+    gauss_kernels = np.reshape(
+      gauss_kernels, (
+        filter_size,
+        input_size,
+        kernel_size
+        ) 
+      ).T
 
     gauss_kernels = tf.convert_to_tensor(
         value=gauss_kernels,
         dtype=dtype)
+
     return gauss_kernels
 
-signature = (
-    numba.int64[:],
-    numba.int64,
-    numba.int64,
-    numba.float64,
-    numba.float64
-)
+def lorentz_dist(support, omega_0, gamma):
+    lorentz_kernel = 1/((support ** 2 - omega_0 ** 2) + (gamma ** 2) * (omega_0 ** 2))
+    return lorentz_kernel
+
+def cauchy_dist(support, s, t):
+    cauchy_kernel = (1/np.pi)*s/(s ** 2 + (support - t) ** 2)
+    return cauchy_kernel
+
+def gaussian_dist(support, mean, stddev):
+    gauss_kernel =  tf.math.exp(-((support - mean) ** 2)/(2*stddev ** 2))
+    gauss_kernel = gauss_kernel / tf.math.reduce_sum(gauss_kernel)        
+    return gauss_kernel
+
+def generate_kernel(shape, weights, kernel_dist, dtype=dtypes.float32, random_init=False):
+    weights_0 = tf.reshape(weights[0, :, :], [-1])
+    weights_1 = tf.reshape(weights[1, :, :], [-1])
+    
+    kernel_size = shape[0]
+    input_size = shape[1]
+    filter_size = shape[2]
+
+    kernel_count =  input_size * filter_size
+
+    truncate = kernel_size/2
+    width = int(truncate + 0.5)
+    kernels = tf.TensorArray(dtype, size=0, dynamic_size=True)
+
+    for i in tf.range(kernel_count):
+
+        shift = 0  # np.random.randint(-kernel_size/2, kernel_size/2)
+        support = tf.convert_to_tensor(
+            value=np.arange(
+                -width - shift,
+                width + 1 - shift
+                ),
+
+            dtype=dtype
+        )
+        center = int(len(support)/2)
+        left_cut = center - int(kernel_size/2)
+        right_cut = center + int(kernel_size/2)
+        
+        weight_0 = weights_0[i]
+        weight_1 = weights_1[i]
+
+        kernel = kernel_dist(support, weight_0, weight_1)
+
+        if (kernel_size % 2) != 0:
+            kernel = kernel[left_cut + 1:right_cut + 2]
+        else:
+            kernel = kernel[left_cut + 1:right_cut + 1]
+        kernels = kernels.write(kernels.size(), kernel)
+
+    kernels = kernels.stack()
+    kernels = tf.transpose(
+        tf.reshape(
+            kernels, 
+            (
+            filter_size,
+            input_size,
+            kernel_size
+            )
+        )
+    )
+
+    kernels = tf.convert_to_tensor(
+        value=kernels,
+        dtype=dtype)
+    return kernels
 
 # @numba.njit(signature)
 def calc_gaussians(kernel_size, gaus_kernel_count, means, stddevs, random_init):
@@ -232,16 +301,100 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=
     return gauss_kernels
 
 
-def plot_gaussian_weights_v1(weights, result_type, before_after):
-    # if not os.path.exists('results' + result_type):
-    #     os.makedirs('results' + result_type)
+def G(x, alpha):
+    """ Return Gaussian line shape at x with HWHM alpha """
+    return np.sqrt(np.log(2) / np.pi) / alpha\
+                             * np.exp(-(x / alpha)**2 * np.log(2))
+
+def L(x, gamma):
+    """ Return Lorentzian line shape at x with HWHM gamma """
+    return gamma / np.pi / (x**2 + gamma**2)
+
+def V(x, alpha, gamma):
+    """
+    Return the Voigt line shape at x with Lorentzian component HWHM gamma
+    and Gaussian component HWHM alpha.
+
+    """
+    sigma = alpha / np.sqrt(2 * np.log(2))
+    v = np.real(wofz((x + 1j*gamma)/sigma/np.sqrt(2))) / sigma\
+                                                           /np.sqrt(2*np.pi)
+    return v
+
+def gen_voigt_kernel(shape, weights, dtype=dtypes.float32, random_init=False):
+
+    alphas = tf.reshape(weights[0, :, :], [-1])
+    gammas = tf.reshape(weights[1, :, :], [-1])
+
+    kernel_size = shape[0]
+    input_size = shape[1]
+    filter_size = shape[2]
+
+    voigt_kernel_count =  input_size * filter_size
+
+    truncate = kernel_size/2
+    width = int(truncate + 0.5)
+    voigt_kernels = tf.TensorArray(dtype, size=0, dynamic_size=True)
+
+    for i in tf.range(voigt_kernel_count):
+
+        shift_voigt = np.random.randint(-kernel_size/2, kernel_size/2)
+        support = tf.convert_to_tensor(
+        value=np.arange(
+            -width - shift_voigt,
+            width + 1 - shift_voigt
+            ),
+
+        dtype=dtype
+        )
+        center = int(len(support)/2)
+        left_cut = center - int(kernel_size/2)
+        right_cut = center + int(kernel_size/2)
+        
+        alpha = alphas[i]
+        gamma = gammas[i]
+
+        voigt_kernel = V(support, alpha, gamma)
+        #tf.math.exp(-((support - mean) ** 2)/(2*stddev ** 2))
+
+        if (kernel_size % 2) != 0:
+            voigt_kernel = voigt_kernel[left_cut + 1:right_cut + 2]
+        else:
+            voigt_kernel = voigt_kernel[left_cut + 1:right_cut + 1]
+        voigt_kernels = voigt_kernels.write(voigt_kernels.size(), voigt_kernel)
+
+    voigt_kernels = voigt_kernels.stack()
+    voigt_kernels = tf.transpose(
+      tf.reshape(
+        voigt_kernels, 
+        (
+          filter_size,
+          input_size,
+          kernel_size
+        )
+      )
+    )
+
+    voigt_kernels = tf.convert_to_tensor(
+        value=voigt_kernels,
+        dtype=dtype)
+    return voigt_kernels
+
+def plot_gaussian_weights_v1(weights, before_after, path):
+    if not os.path.exists('results' + path):
+        os.makedirs('results' + path)
+
     plt.ylabel('density')
     plt.xlabel('kernel size')
     plt.title('Gaussian Kernel of ContConv1V1 with Layer softplus act. fun ' + before_after)
     plt.plot(weights[:, 0, :])
+    plt.savefig('results' + path + 'weights_plot' + '.png')
     plt.show()
 
-def plot_gaussian_weights_v2(weights, mean, stddev, kernel_size, before_after):
+def plot_gaussian_weights_v2(weights, mean, stddev, kernel_size, before_after, path):
+    if not os.path.exists('results' + path):
+        os.makedirs('results' + path)
+
     truncate = kernel_size/2
 
     width = int(truncate + 0.5)
@@ -262,16 +415,17 @@ def plot_gaussian_weights_v2(weights, mean, stddev, kernel_size, before_after):
         plt.plot(gauss_kernel)
     plt.ylabel('density')
     plt.xlabel('kernel size')
-    plt.title('Gaussian Kernel of ContConv1DV2 with Layer softplus act. fun ' + before_after)
+    plt.title('First Layer of ResNet CCNN '+ before_after +' train')
+    plt.savefig('results' + path + 'weights_plot_' + before_after + '.png')
     plt.show()
 
-def plot_derivative_energy(x, dT_dn, model, n, result_type):
-    if not os.path.exists('results' + result_type):
-        os.makedirs('results' + result_type)
+def plot_derivative_energy(x, dT_dn, model, n, path):
+    if not os.path.exists('results' + path):
+        os.makedirs('results' + path)
 
     plt.plot(x, dT_dn[0])
     plt.plot(x, tf.squeeze(model(n[0].reshape((1, 500, 1)).astype(np.float32))['dT_dn']))
     plt.ylabel('dT_dn')
-    plt.title('Comparison reference with trained')
-#    plt.savefig('results' + result_type + 'dT_dn_V1_' + before_after + '.png')
+    plt.title('Comparison reference with trained energy derivative')
+    plt.savefig('results' + path + 'dT_dn_V1_' + '.png')
     plt.show()

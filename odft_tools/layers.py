@@ -21,6 +21,7 @@ from tensorflow.python.ops import nn
 
 import tensorflow as tf
 import numpy as np
+import keras
 import functools
 import six
 
@@ -43,7 +44,7 @@ class IntegrateLayer(tf.keras.layers.Layer):
 
 # For the Version 1 of the Continuous CNN we just need to set the
 # kernel_initializer with a costum kernel
-class Continuous1DConvV1(tf.python.keras.layers.convolutional.Conv1D):
+class Continuous1DConvV1(keras.layers.convolutional.Conv1D):
     """
     Arguments:
         filters: Integer, the dimensionality of the output space
@@ -78,7 +79,7 @@ class Continuous1DConvV1(tf.python.keras.layers.convolutional.Conv1D):
 # distributions.
 # Here we had to set the parameters from the dist. as 
 # the weights
-class Continuous1DConv(tf.python.keras.layers.convolutional.Conv1D):
+class Continuous1DConv(keras.layers.convolutional.Conv1D):
     """
     Arguments:
         filters: Integer, the dimensionality of the output space

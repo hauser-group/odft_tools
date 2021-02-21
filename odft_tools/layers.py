@@ -20,6 +20,7 @@ from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import nn
 
 import tensorflow as tf
+import keras
 import numpy as np
 import functools
 import six
@@ -43,7 +44,7 @@ class IntegrateLayer(tf.keras.layers.Layer):
 
 # For the Version 1 of the Continuous CNN we just need to set the
 # kernel_initializer with a costum kernel
-class Continuous1DConvV1(tf.python.keras.layers.convolutional.Conv1D):
+class Continuous1DConvV1(keras.layers.convolutional.Conv1D):
     """
     Arguments:
         filters: Integer, the dimensionality of the output space
@@ -76,9 +77,9 @@ class Continuous1DConvV1(tf.python.keras.layers.convolutional.Conv1D):
 # For the generic (several distributions choice) the
 # Version 2 we can choose in the init func. different
 # distributions.
-# Here we had to set the parameters from the dist. as 
+# Here we had to set the parameters from the dist. as
 # the weights
-class Continuous1DConv(tf.python.keras.layers.convolutional.Conv1D):
+class Continuous1DConv(keras.layers.convolutional.Conv1D):
     """
     Arguments:
         filters: Integer, the dimensionality of the output space
@@ -135,7 +136,7 @@ class Continuous1DConv(tf.python.keras.layers.convolutional.Conv1D):
                                                             input_shape))
         self.kernel_shape = self.kernel_size + (input_channel // self.groups,
                                            self.filters)
-        
+
         # The construiction of weights shape has changed
         self.costum_weights_shape = (len(self.weights_init), ) + (input_channel // self.groups,
                                            self.filters)
@@ -176,7 +177,7 @@ class Continuous1DConv(tf.python.keras.layers.convolutional.Conv1D):
         tf_dilations = list(self.dilation_rate)
         tf_strides = list(self.strides)
 
-        
+
         tf_op_name = self.__class__.__name__
         if tf_op_name == self.costum_kernel_type + 'Conv1D':
             tf_op_name = self.costum_kernel_type + 'conv1d'  # Backwards compat.

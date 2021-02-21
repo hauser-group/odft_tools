@@ -22,6 +22,7 @@ from tensorflow.python.ops import nn
 import tensorflow as tf
 import keras
 import numpy as np
+import keras
 import functools
 import six
 

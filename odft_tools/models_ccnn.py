@@ -9,7 +9,6 @@ from odft_tools.utils import (first_derivative_matrix,
                               integrate)
 from odft_tools.layers import (
     Continuous1DConvV1,
-    Continuous1DConvV2,
     IntegrateLayer,
     Continuous1DConv
 )
@@ -72,7 +71,7 @@ class ContCNNV1(ClassicCNN):
     def __init__(
             self,
             layers=[32,],
-            kernel_size=64,
+            kernel_size=100,
             dx=0.002,
             weights=[5, 5]):
         super().__init__()
@@ -82,15 +81,25 @@ class ContCNNV1(ClassicCNN):
         stddev = weights[1]
 
         for l in layers:
-            cont_layer = Continuous1DConvV1(
-                   filters=32,
-                   kernel_size=kernel_size,
-                   activation='softplus',
-                   padding='same',
-                   weights_init=[mean, stddev],
-                   random_init=True
-            )
-            self.conv_layers.append(cont_layer)
+            if l == 0 and 2:
+                cont_layer = Continuous1DConvV1(
+                    filters=32,
+                    kernel_size=kernel_size,
+                    activation='softplus',
+                    padding='same',
+                    weights_init=[mean, stddev],
+                    random_init=True
+                )
+                self.conv_layers.append(cont_layer)
+            else:
+                cont_layer = tf.keras.layers.Conv1D(
+                    filters=32,
+                    kernel_size=kernel_size,
+                    activation='softplus',
+                    padding='same',
+                    name='Conv1D_act_' + str(l)
+                )
+                self.conv_layers.append(cont_layer)
             # self.conv_layers.append(cont_layer)
         # last layer is fixed to use a single filter
         cont_layer = Continuous1DConvV1(

@@ -114,6 +114,41 @@ class ContCNNV1(ClassicCNN):
         self.integrate = IntegrateLayer(dx)
 
 
+class ContCNNV1Dense(ClassicCNN):
+    def __init__(
+            self,
+            layers=[32,],
+            kernel_size=100,
+            dx=0.002,
+            weights=[5, 5]):
+        super().__init__()
+        self.dx = dx
+        self.conv_layers = []
+        mean = weights[0]
+        stddev = weights[1]
+
+        for l in layers:
+            if l == 0:
+                cont_layer = Continuous1DConvV1(
+                    filters=32,
+                    kernel_size=kernel_size,
+                    activation='linear',
+                    padding='same',
+                    weights_init=[mean, stddev],
+                    random_init=True
+                )
+
+            else:
+                cont_layer = tf.keras.layers.Dense(32, activation='relu')
+
+            self.conv_layers.append(cont_layer)
+        # last layer is fixed to use a single filter
+        cont_layer = tf.keras.layers.Dense(32, activation='linear')
+
+        self.conv_layers.append(cont_layer)
+        self.integrate = IntegrateLayer(dx)
+
+
 class ContCNNModel(ClassicCNN):
     def __init__(
             self,

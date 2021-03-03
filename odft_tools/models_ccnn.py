@@ -81,25 +81,25 @@ class ContCNNV1(ClassicCNN):
         stddev = weights[1]
 
         for l in layers:
-            if l == 0 and 2:
-                cont_layer = Continuous1DConvV1(
-                    filters=32,
-                    kernel_size=kernel_size,
-                    activation='softplus',
-                    padding='same',
-                    weights_init=[mean, stddev],
-                    random_init=True
-                )
-                self.conv_layers.append(cont_layer)
-            else:
-                cont_layer = tf.keras.layers.Conv1D(
-                    filters=32,
-                    kernel_size=kernel_size,
-                    activation='softplus',
-                    padding='same',
-                    name='Conv1D_act_' + str(l)
-                )
-                self.conv_layers.append(cont_layer)
+            # if l == 0 or 2 or 4 or 6:
+            cont_layer = Continuous1DConvV1(
+                filters=32,
+                kernel_size=kernel_size,
+                activation='softplus',
+                padding='same',
+                weights_init=[mean, stddev],
+                random_init=True
+            )
+            self.conv_layers.append(cont_layer)
+            # else:
+            #     cont_layer = tf.keras.layers.Conv1D(
+            #         filters=32,
+            #         kernel_size=kernel_size,
+            #         activation='softplus',
+            #         padding='same',
+            #         name='Conv1D_act_' + str(l)
+            #     )
+            #     self.conv_layers.append(cont_layer)
             # self.conv_layers.append(cont_layer)
         # last layer is fixed to use a single filter
         cont_layer = Continuous1DConvV1(

@@ -20,10 +20,10 @@ def first_derivative_matrix(G, h, method='three_point'):
         mat = (np.diag(-0.5*np.ones(G-1), k=-1)
                + np.diag(0.5*np.ones(G-1), k=1))
         mat[0, :3] = (-3/2, 2, -1/2)
-        mat[-1, -3:] = -np.flip(mat[0, :3])    
+        mat[-1, -3:] = -np.flip(mat[0, :3])
     elif method == 'five_point':
         mat = (np.diag(1/12*np.ones(G-2), k=-2)
-               + np.diag(-2/3*np.ones(G-1), k=-1) 
+               + np.diag(-2/3*np.ones(G-1), k=-1)
                + np.diag(2/3*np.ones(G-1), k=1)
                + np.diag(-1/12*np.ones(G-2), k=2))
         mat[0, :5] = (-25/12, 4, -3, 16/12, -3/12)
@@ -38,14 +38,14 @@ def first_derivative_matrix(G, h, method='three_point'):
 def second_derivative_matrix(G, h, method='three_point'):
     if method == 'three_point':
         mat = (np.diag(np.ones(G-1), k=-1)
-               - 2.0*np.eye(G) 
+               - 2.0*np.eye(G)
                + np.diag(np.ones(G-1), k=1))
         mat[0, :4] = (2, -5, 4, -1)
         mat[-1, -4:] = np.flip(mat[0, :4])
     elif method == 'five_point':
         mat = (np.diag(-1/12*np.ones(G-2), k=-2)
                + np.diag(4/3*np.ones(G-1), k=-1)
-               - 5/2*np.eye(G) 
+               - 5/2*np.eye(G)
                + np.diag(4/3*np.ones(G-1), k=1)
                + np.diag(-1/12*np.ones(G-2), k=2))
         mat[0, :6] = (45/12, -154/12, 214/12, -156/12, 61/12, -10/12)
@@ -58,7 +58,7 @@ def second_derivative_matrix(G, h, method='three_point'):
     def create_res_net_model(self):
         dens
     def create_res_net_model(self):
-        dens   
+        dens
     return mat
 
 
@@ -70,7 +70,7 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=
       stddev: stddev of gaussian
       dtype: Optional dtype of the tensor. Only floating point types are
          supported.
-    """ 
+    """
     mean = weights[0]
     stddev = weights[1]
     kernel_size = shape[0]
@@ -79,7 +79,7 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=
 
     gaus_kernel_count =  input_size * filter_size
 
-    # Distribute uniform means and stddev 
+    # Distribute uniform means and stddev
     # lenght is kernel size times input size
     if random_init:
         means = np.random.uniform(
@@ -121,7 +121,7 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=
         filter_size,
         input_size,
         kernel_size
-        ) 
+        )
       ).T
 
     gauss_kernels = tf.convert_to_tensor(
@@ -140,13 +140,13 @@ def cauchy_dist(support, s, t):
 
 def gaussian_dist(support, mean, stddev):
     gauss_kernel =  tf.math.exp(-((support - mean) ** 2)/(2*stddev ** 2))
-    gauss_kernel = gauss_kernel / tf.math.reduce_sum(gauss_kernel)        
+    gauss_kernel = gauss_kernel / tf.math.reduce_sum(gauss_kernel)
     return gauss_kernel
 
 def generate_kernel(shape, weights, kernel_dist, dtype=dtypes.float32, random_init=False):
     weights_0 = tf.reshape(weights[0, :, :], [-1])
     weights_1 = tf.reshape(weights[1, :, :], [-1])
-    
+
     kernel_size = shape[0]
     input_size = shape[1]
     filter_size = shape[2]
@@ -171,7 +171,7 @@ def generate_kernel(shape, weights, kernel_dist, dtype=dtypes.float32, random_in
         center = int(len(support)/2)
         left_cut = center - int(kernel_size/2)
         right_cut = center + int(kernel_size/2)
-        
+
         weight_0 = weights_0[i]
         weight_1 = weights_1[i]
 
@@ -186,7 +186,7 @@ def generate_kernel(shape, weights, kernel_dist, dtype=dtypes.float32, random_in
     kernels = kernels.stack()
     kernels = tf.transpose(
         tf.reshape(
-            kernels, 
+            kernels,
             (
             filter_size,
             input_size,
@@ -240,7 +240,7 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=
       stddev: stddev of gaussian
       dtype: Optional dtype of the tensor. Only floating point types are
          supported.
-    """ 
+    """
     mean = weights[0]
     stddev = weights[1]
     kernel_size = shape[0]
@@ -249,7 +249,7 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=
 
     gaus_kernel_count =  input_size * filter_size
 
-    # Distribute unoform means and stddev 
+    # Distribute unoform means and stddev
     # lenght is kernel size times input size
     if random_init:
         means = np.random.uniform(
@@ -291,7 +291,7 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=
         filter_size,
         input_size,
         kernel_size
-        ) 
+        )
       ).T
 
     gauss_kernels = tf.convert_to_tensor(
@@ -350,7 +350,7 @@ def gen_voigt_kernel(shape, weights, dtype=dtypes.float32, random_init=False):
         center = int(len(support)/2)
         left_cut = center - int(kernel_size/2)
         right_cut = center + int(kernel_size/2)
-        
+
         alpha = alphas[i]
         gamma = gammas[i]
 
@@ -366,7 +366,7 @@ def gen_voigt_kernel(shape, weights, dtype=dtypes.float32, random_init=False):
     voigt_kernels = voigt_kernels.stack()
     voigt_kernels = tf.transpose(
       tf.reshape(
-        voigt_kernels, 
+        voigt_kernels,
         (
           filter_size,
           input_size,
@@ -388,8 +388,9 @@ def plot_gaussian_weights_v1(weights, before_after, path):
     plt.xlabel('kernel size')
     plt.title('Gaussian Kernel of ContConv1V1 with Layer softplus act. fun ' + before_after)
     plt.plot(weights[:, 0, :])
-    plt.savefig('results' + path + 'weights_plot' + '.png')
+    plt.savefig(path + 'weights_plot' + before_after + '.png')
     plt.show()
+    plt.close()
 
 def plot_gaussian_weights_v2(weights, mean, stddev, kernel_size, before_after, path):
     if not os.path.exists('results' + path):
@@ -416,8 +417,10 @@ def plot_gaussian_weights_v2(weights, mean, stddev, kernel_size, before_after, p
     plt.ylabel('density')
     plt.xlabel('kernel size')
     plt.title('First Layer of ResNet CCNN '+ before_after +' train')
-    plt.savefig('results' + path + 'weights_plot_' + before_after + '.png')
+    plt.savefig(path + 'weights_plot_' + before_after + '.png')
     plt.show()
+    plt.close()
+
 
 def plot_derivative_energy(x, dT_dn, model, n, path):
     if not os.path.exists('results' + path):
@@ -427,5 +430,6 @@ def plot_derivative_energy(x, dT_dn, model, n, path):
     plt.plot(x, tf.squeeze(model(n[0].reshape((1, 500, 1)).astype(np.float32))['dT_dn']))
     plt.ylabel('dT_dn')
     plt.title('Comparison reference with trained energy derivative')
-    plt.savefig('results' + path + 'dT_dn_V1_' + '.png')
+    plt.savefig(path + 'dT_dn_V1_' + '.png')
     plt.show()
+    plt.close()

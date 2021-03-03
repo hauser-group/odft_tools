@@ -49,7 +49,7 @@ class ResNetConv1DModel(keras.Model):
         # The kind of layers is set here
         density = tf.keras.layers.Input(shape=(500,), name='density')
         value = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(density)
-        
+
         for l in range(self.num_res_net_blocks):
             inputs = value
             value = tf.keras.layers.Conv1D(
@@ -120,25 +120,34 @@ class ResNetContConv1DModel(ResNetConv1DModel):
         for l in range(self.num_res_net_blocks):
             inputs = value
 
-            if l == 0:
-                value = Continuous1DConvV1(
-                    filters=self.filter_size,
-                    kernel_size=self.kernel_size,
-                    activation='softplus',
-                    padding='same',
-                    weights_init=self.weights_gaus,
-                    random_init=self.random_init
-                )(value)
-            else:
-                value = tf.keras.layers.Conv1D(
-                    filters=self.filter_size,
-                    kernel_size=self.kernel_size,
-                    activation='softplus',
-                    padding='same',
-                    name='Conv1D_act_' + str(l)
-                )(value)
+#             if l == 0:
+            value = Continuous1DConvV1(
+                filters=self.filter_size,
+                kernel_size=self.kernel_size,
+                activation='softplus',
+                padding='same',
+                weights_init=self.weights_gaus,
+                random_init=self.random_init
+            )(value)
+#             else:
+#                 value = tf.keras.layers.Conv1D(
+#                     filters=self.filter_size,
+#                     kernel_size=self.kernel_size,
+#                     activation='softplus',
+#                     padding='same',
+#                     name='Conv1D_act_' + str(l)
+#                 )(value)
 
             # res_net layer for '+ x'
+            # value = Continuous1DConvV1(
+            #     filters=self.filter_size,
+            #     kernel_size=self.kernel_size,
+            #     activation=None,
+            #     padding='same',
+            #     weights_init=self.weights_gaus,
+            #     random_init=self.random_init,
+            #     name='Conv1D_noact_' + str(l)
+            # )(value)
             value = tf.keras.layers.Conv1D(
                 filters=self.filter_size,
                 kernel_size=self.kernel_size,
@@ -149,8 +158,17 @@ class ResNetContConv1DModel(ResNetConv1DModel):
 
             value = tf.keras.layers.Add()([value, inputs])
             value = tf.keras.layers.Activation('softplus', name='act' + str(l))(value)
-        
+
         # last layer is fixed to use a single filter
+        # value = Continuous1DConvV1(
+        #     filters=1,
+        #     kernel_size=self.kernel_size,
+        #     activation=None,
+        #     padding='same',
+        #     weights_init=self.weights_gaus,
+        #     random_init=self.random_init,
+        #     name='Conv1D_end_' + str(l),
+        # )(value)
         value = tf.keras.layers.Conv1D(
             filters=1,
             kernel_size=self.kernel_size,
@@ -189,7 +207,7 @@ class ResNetContConv1DV2Model(ResNetConv1DModel):
         for l in range(self.num_res_net_blocks):
             inputs = value
 
-            if l == 0 and l == 2:
+            if l == 0:
                 value = Continuous1DConv(
                     filters=self.filter_size,
                     kernel_size=self.kernel_size,
@@ -230,7 +248,7 @@ class ResNetContConv1DV2Model(ResNetConv1DModel):
 
             value = tf.keras.layers.Add()([value, inputs])
             value = tf.keras.layers.Activation('softplus', name='act' + str(l))(value)
-        
+
         # last layer is fixed to use a single filter
         value = tf.keras.layers.Conv1D(
             filters=1,

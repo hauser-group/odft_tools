@@ -1,3 +1,8 @@
 numpy
 scipy
 Cython
+tensorflow
+matplotlib
+h5py
+keras
+numba

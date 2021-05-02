@@ -129,14 +129,6 @@ class ResNetContConv1DModel(ResNetConv1DModel):
                 weights_init=self.weights_gaus,
                 random_init=self.random_init
             )(value)
-#             else:
-#                 value = tf.keras.layers.Conv1D(
-#                     filters=self.filter_size,
-#                     kernel_size=self.kernel_size,
-#                     activation='softplus',
-#                     padding='same',
-#                     name='Conv1D_act_' + str(l)
-#                 )(value)
 
             # res_net layer for '+ x'
             # value = Continuous1DConvV1(

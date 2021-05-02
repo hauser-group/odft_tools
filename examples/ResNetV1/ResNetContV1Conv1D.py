@@ -57,8 +57,8 @@ N = 1
 # density is wavefunction squared
 n = np.sum(data['wavefunctions'][:, :, :N]**2, axis=-1)
 # integrate using trapezoidal rule:
-V = np.sum(0.5*(data['potential'][:, :-1]*n[:, :-1] 
-                + data['potential'][:, 1:]*n[:, 1:])           
+V = np.sum(0.5*(data['potential'][:, :-1]*n[:, :-1]
+                + data['potential'][:, 1:]*n[:, 1:])
            * dx, axis=-1)
 # kinetic energy is total energy minus potential energy
 T = np.sum(data['energies'][:, :N], axis=-1) - V
@@ -85,13 +85,13 @@ with h5py.File(data_path + 'dataset_validate.hdf5', 'r') as f:
 # density is wavefunction squared
 n_test = np.sum(data_test['wavefunctions'][:, :, :N]**2, axis=-1)
 # integrate using trapezoidal rule:
-V_test = np.sum(0.5*(data_test['potential'][:, :-1]*n_test[:, :-1] 
-                + data_test['potential'][:, 1:]*n_test[:, 1:])           
+V_test = np.sum(0.5*(data_test['potential'][:, :-1]*n_test[:, :-1]
+                + data_test['potential'][:, 1:]*n_test[:, 1:])
                 * dx, axis=-1)
 # kinetic energy is total energy minus potential energy
 T_test = np.sum(data_test['energies'][:, :N], axis=-1) - V_test
 # kinetic energy derivative
-dT_dn_test = - data_test['potential'] + np.expand_dims(np.sum(data_test['energies'][:, :N], axis=-1)/N, axis=-1) 
+dT_dn_test = - data_test['potential'] + np.expand_dims(np.sum(data_test['energies'][:, :N], axis=-1)/N, axis=-1)
 n_test = n_test.reshape((-1, 500))
 
 
@@ -122,7 +122,7 @@ initial_learning_rate = WarmupExponentialDecay(
     name=None
 )
 
-path = '/ResNetContConv1D/'
+path = 'results/ResNetContConv1D/'
 
 
 seed = 0
@@ -147,8 +147,8 @@ model = ResNetContConv1DModel(
 
 model.create_res_net_model()
 model.build(input_shape=(1, 500))
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=initial_learning_rate, amsgrad=False), 
-              loss={'T': 'mse', 'dT_dn': 'mse'}, 
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=initial_learning_rate, amsgrad=False),
+              loss={'T': 'mse', 'dT_dn': 'mse'},
               loss_weights={'T': 0.2, 'dT_dn': 1.0}, # As recommended by Manuel: scale the loss in T by 0.2
               metrics={'T': ['mae'], 'dT_dn': ['mae']})
 print('--------------------------------->Start<---------------------------------')
@@ -178,7 +178,7 @@ df['loss'] = model.history.history['loss']
 df['dT_dn_loss'] = model.history.history['dT_dn_loss']
 df['T_loss'] = model.history.history['T_loss']
 
-df.to_csv('results' + path + '/losses.csv')
+df.to_csv(path + '/losses.csv')
 
 plt.figure(figsize=(20, 3))
 
@@ -186,7 +186,7 @@ plt.plot(df['loss'][1:])
 plt.xlabel('epochs')
 plt.ylabel('loss a.u.')
 plt.title('loss over epochs for ResNet CCNN')
-plt.savefig('results/' + path + 'loss_ResNet_CNNV1.png')
+plt.savefig(path + 'loss_ResNet_CNNV1.png')
 plt.show()
 
 

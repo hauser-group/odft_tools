@@ -49,7 +49,7 @@ class ContCNNV1(ClassicCNN):
         mean = weights[0]
         stddev = weights[1]
 
-        for l in layers:
+        for l in range(len(layers)):
             if l == 0 or 2 or 4:
                 cont_layer = Continuous1DConvV1(
                     filters=32,
@@ -189,11 +189,19 @@ training_dataset = tf.data.Dataset.from_tensor_slices((n.astype(np.float32), {'T
 
 path = 'results/ContCNNV1Alter/'
 
+def to_weights(model, before_after):
+    for lay in range(len(model.layers) - 1):
+        weights_layer = pd.DataFrame(model.layers[lay].get_weights()[0][:, 0, :])
+        if not os.path.exists(path + 'weigths/'):
+            os.makedirs(path + 'weigths/')
+        weights_layer.to_csv(path + 'weigths/' + 'weights'+ before_after + '_layer' + str(lay) + '.csv')
+
+to_weights(model, 'before')
 # Beware when comparing the results to our paper. The output here is in Hartree!
 weights_before_train = model.layers[0].get_weights()[0]
 model.fit(training_dataset, epochs=2000, verbose=2, validation_data=(n_test, {'T': T_test, 'dT_dn': dT_dn_test}), validation_freq=10, callbacks=[callback]) #
 weights_after_train = model.layers[0].get_weights()[0]
-
+to_weights(model, 'after')
 
 plot_gaussian_weights_v1(weights_before_train, path, 'before')
 plot_gaussian_weights_v1(weights_after_train, path, 'after')
@@ -206,8 +214,7 @@ df = pd.DataFrame([])
 df['loss'] = model.history.history['loss']
 df['dT_dn_loss'] = model.history.history['dT_dn_loss']
 df['T_loss'] = model.history.history['T_loss']
-
-df.to_csv('results/' + path + 'losses.csv')
+df.to_csv(path + 'losses.csv')
 
 plt.figure(figsize=(20, 3))
 

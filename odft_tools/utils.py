@@ -3,9 +3,13 @@ import numba
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import random
 
 from tensorflow.python.framework import dtypes
-from scipy.special import wofz
+from scipy.special import (
+    wofz,
+    factorial
+)
 
 def integrate(fun, h, method='trapezoidal'):
     if method == 'simple':
@@ -200,6 +204,59 @@ def generate_kernel(shape, weights, kernel_dist, dtype=dtypes.float32, random_in
         dtype=dtype)
     return kernels
 
+def calc_trigonometrics(kernel_size, kernel_count):
+    trigonometris = []
+    x = np.linspace(-kernel_size/2, kernel_size/2, kernel_size)
+    trig_max = 0.05
+    trig_min = -0.05
+    for i in range(kernel_count):
+        # if random.random() > 0.5:
+        y = (random.random() * np.exp(-random.random()) * np.sin(random.random() * x)/(x) + random.random() * np.cos(random.random() * x)*np.exp(-random.random()))
+        # y = random.random() * np.sin(x * random.random() + random.randint(0, 50)) / x
+        # else:
+        #     y = random.random() * np.cos(x * random.random() + random.randint(0, 50)) / x
+        y = (trig_max - trig_min) * (y - min(y)/(max(y) - min(y))) + trig_min
+
+        trigonometris.append(y)
+    return trigonometris
+
+def get_psi(v, q, Hr):
+    m = random.randrange(0, 10)
+    omega = random.randrange(0, 10)
+    n = (m*omega)/np.sqrt(np.sqrt(np.pi)*2**v*factorial(v))
+    return n*Hr[v](q)*np.exp(-q*q/2.)
+
+def get_turning_points(v, get_E):
+    qmax = np.sqrt(2. * get_E(v + 0.5))
+    return -qmax, qmax
+
+def calc_harmonic(kernel_size, kernel_count):
+    harmonics = []
+    get_E = lambda v: v + 0.5
+
+    hr = [None] * (kernel_count + 1)
+    hr[0] = np.poly1d([1.,])
+    hr[1] = np.poly1d([2., 0.])
+    max_rang = 24
+    for v in range(2, kernel_count + 1):
+        if v > max_rang:
+            v = max_rang
+        hr[v] = hr[1]*hr[v-1] - 2*(v-1)*hr[v-2]
+
+    qmin, qmax = get_turning_points(kernel_count, get_E)
+    q = np.linspace(qmin, qmax, kernel_size)
+    har_max = 0.05
+    har_min = -0.05
+    for v in range(kernel_count):
+        if v > max_rang:
+            v = max_rang
+        har = get_psi(v, q, hr)
+
+        har = (har_max - har_min) * (har - min(har)/(max(har) - min(har))) + har_min
+
+        harmonics.append(har)
+    return harmonics
+
 # @numba.njit(signature)
 def calc_gaussians(kernel_size, gaus_kernel_count, means, stddevs, random_init):
     gauss_kernels = []
@@ -228,9 +285,83 @@ def calc_gaussians(kernel_size, gaus_kernel_count, means, stddevs, random_init):
             gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 2]
         else:
             gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 1]
-
+        gauss_kernel = gauss_kernel - 0.04
         gauss_kernels.append(gauss_kernel)
     return gauss_kernels
+
+def gen_trigonometrics_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=False):
+    """ Returns a tensor object cotnaining gaussian kernels
+    Args:
+      shape: Shape of the tensor.
+      mean: mean of gaussian
+      stddev: stddev of gaussian
+      dtype: Optional dtype of the tensor. Only floating point types are
+         supported.
+    """
+    mean = weights[0]
+    stddev = weights[1]
+    kernel_size = shape[0]
+    input_size = shape[1]
+    filter_size = shape[2]
+
+    kernel_count =  input_size * filter_size
+
+    # calc harmonic kernel
+    trigonom_kernels = calc_trigonometrics(
+        kernel_size,
+        kernel_count
+    )
+
+    trigonom_kernels = np.reshape(
+        trigonom_kernels, (
+        filter_size,
+        input_size,
+        kernel_size
+        )
+      ).T
+
+    trigonom_kernels = tf.convert_to_tensor(
+        value=trigonom_kernels,
+        dtype=dtype)
+
+    return trigonom_kernels
+
+def gen_harmonic_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=False):
+    """ Returns a tensor object cotnaining gaussian kernels
+    Args:
+      shape: Shape of the tensor.
+      mean: mean of gaussian
+      stddev: stddev of gaussian
+      dtype: Optional dtype of the tensor. Only floating point types are
+         supported.
+    """
+    mean = weights[0]
+    stddev = weights[1]
+    kernel_size = shape[0]
+    input_size = shape[1]
+    filter_size = shape[2]
+
+    kernel_count =  input_size * filter_size
+
+    # calc harmonic kernel
+    harmonic_kernels = calc_harmonic(
+        kernel_size,
+        kernel_count
+    )
+
+    harmonic_kernels = np.reshape(
+      harmonic_kernels, (
+        filter_size,
+        input_size,
+        kernel_size
+        )
+      ).T
+
+    harmonic_kernels = tf.convert_to_tensor(
+        value=harmonic_kernels,
+        dtype=dtype)
+
+    return harmonic_kernels
 
 def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=False):
     """ Returns a tensor object cotnaining gaussian kernels

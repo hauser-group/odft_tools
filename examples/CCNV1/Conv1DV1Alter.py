@@ -2,8 +2,8 @@
 # coding: utf-8
 
 # In[ ]:
-
-
+import os
+import pandas as pd
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
@@ -177,7 +177,7 @@ model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001, amsgrad=Fa
 
 callback = tf.keras.callbacks.EarlyStopping(
     monitor='loss',
-    patience=500,
+    patience=1000,
     restore_best_weights=True,
 )
 
@@ -199,9 +199,33 @@ def to_weights(model, before_after):
 to_weights(model, 'before')
 # Beware when comparing the results to our paper. The output here is in Hartree!
 weights_before_train = model.layers[0].get_weights()[0]
-model.fit(training_dataset, epochs=2000, verbose=2, validation_data=(n_test, {'T': T_test, 'dT_dn': dT_dn_test}), validation_freq=10, callbacks=[callback]) #
+model.fit(training_dataset, epochs=4000, verbose=2, validation_data=(n_test, {'T': T_test, 'dT_dn': dT_dn_test}), validation_freq=10, callbacks=[callback]) #
 weights_after_train = model.layers[0].get_weights()[0]
 to_weights(model, 'after')
+
+def plot_gaussian_weights_v1(weights, path, before_after):
+    if not os.path.exists(path):
+        os.makedirs(path)
+    plt.ylabel('density')
+    plt.xlabel('kernel size')
+    plt.title('First Layer of CCNN '+ before_after +' train')
+    plt.plot(weights[:, 0, :])
+    plt.savefig(path + 'layer_ccnV1_'+ before_after +'.png')
+    plt.show()
+    plt.close()
+
+
+def plot_derivative_energy(x, dT_dn, model, n, path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    plt.plot(x, dT_dn[0])
+    plt.plot(x, tf.squeeze(model(n[0].reshape((1, 500, 1)).astype(np.float32))['dT_dn']))
+    plt.ylabel('dT_dn')
+    plt.title('Comparison reference with trained energy derivative')
+    plt.savefig(path + 'ccnnV1_energy_derivatice.png')
+    plt.show()
+    plt.close()
 
 plot_gaussian_weights_v1(weights_before_train, path, 'before')
 plot_gaussian_weights_v1(weights_after_train, path, 'after')
@@ -209,7 +233,6 @@ plot_gaussian_weights_v1(weights_after_train, path, 'after')
 plot_derivative_energy(x, dT_dn, model, n, path)
 
 
-import pandas as pd
 df = pd.DataFrame([])
 df['loss'] = model.history.history['loss']
 df['dT_dn_loss'] = model.history.history['dT_dn_loss']

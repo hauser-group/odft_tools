@@ -65,7 +65,6 @@ def second_derivative_matrix(G, h, method='three_point'):
         dens
     return mat
 
-
 def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=False):
     """ Returns a tensor object cotnaining gaussian kernels
     Args:
@@ -306,7 +305,7 @@ def gen_trigonometrics_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random
 
     kernel_count =  input_size * filter_size
 
-    # calc harmonic kernel
+    # calc  kernel
     trigonom_kernels = calc_trigonometrics(
         kernel_size,
         kernel_count
@@ -510,57 +509,3 @@ def gen_voigt_kernel(shape, weights, dtype=dtypes.float32, random_init=False):
         value=voigt_kernels,
         dtype=dtype)
     return voigt_kernels
-
-def plot_gaussian_weights_v1(weights, before_after, path):
-    if not os.path.exists('results' + path):
-        os.makedirs('results' + path)
-
-    plt.ylabel('density')
-    plt.xlabel('kernel size')
-    plt.title('Gaussian Kernel of ContConv1V1 with Layer softplus act. fun ' + before_after)
-    plt.plot(weights[:, 0, :])
-    plt.savefig(path + 'weights_plot' + before_after + '.png')
-    plt.show()
-    plt.close()
-
-def plot_gaussian_weights_v2(weights, mean, stddev, kernel_size, before_after, path):
-    if not os.path.exists('results' + path):
-        os.makedirs('results' + path)
-
-    truncate = kernel_size/2
-
-    width = int(truncate + 0.5)
-    support = np.arange(-width, width + 1)
-    center = int(len(support)/2)
-
-    left_cut = center - int(kernel_size/2)
-    right_cut = center + int(kernel_size/2)
-
-    for mean, stddev in zip(weights[0][0], weights[1][0]):
-        gauss_kernel = np.exp(-((support - mean) ** 2)/(2*stddev ** 2))
-        gauss_kernel = gauss_kernel / gauss_kernel.sum()
-
-        if (kernel_size % 2) != 0:
-            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 2]
-        else:
-            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 1]
-        plt.plot(gauss_kernel)
-    plt.ylabel('density')
-    plt.xlabel('kernel size')
-    plt.title('First Layer of ResNet CCNN '+ before_after +' train')
-    plt.savefig(path + 'weights_plot_' + before_after + '.png')
-    plt.show()
-    plt.close()
-
-
-def plot_derivative_energy(x, dT_dn, model, n, path):
-    if not os.path.exists('results' + path):
-        os.makedirs('results' + path)
-
-    plt.plot(x, dT_dn[0])
-    plt.plot(x, tf.squeeze(model(n[0].reshape((1, 500, 1)).astype(np.float32))['dT_dn']))
-    plt.ylabel('dT_dn')
-    plt.title('Comparison reference with trained energy derivative')
-    plt.savefig(path + 'dT_dn_V1_' + '.png')
-    plt.show()
-    plt.close()

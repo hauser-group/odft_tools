@@ -1,7 +1,9 @@
+import pandas as pd
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+import os
 # from https://github.com/hauser-group/odft_tools
 from odft_tools.models_ccnn import (
     ClassicCNN,
@@ -123,7 +125,7 @@ model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001, amsgrad=F
 
 callback = tf.keras.callbacks.EarlyStopping(
     monitor='loss',
-    patience=500,
+    patience=1000,
     restore_best_weights=True,
 )
 
@@ -144,20 +146,12 @@ training_dataset = tf.data.Dataset.from_tensor_slices((n.astype(np.float32), {'T
 
 # In[ ]:
 
-def to_weights(model, before_after):
-    for lay in range(len(model.layers) - 1):
-        weights_layer = pd.DataFrame(model.layers[lay].get_weights()[0][:, 0, :])
-        if not os.path.exists(path + 'weigths/'):
-            os.makedirs(path + 'weigths/')
-        weights_layer.to_csv(path + 'weigths/' + 'weights'+ before_after + '_layer' + str(lay) + '.csv')
 
-to_weights(model, 'before')
 
 # Beware when comparing the results to our paper. The output here is in Hartree!
 weights_before_train = model.layers[0].get_weights()[0]
-model.fit(training_dataset, epochs=3000, verbose=2, validation_data=(n_test, {'T': T_test, 'dT_dn': dT_dn_test}), validation_freq=10, callbacks=[callback, cp_callback])
+model.fit(training_dataset, epochs=20000, verbose=2, validation_data=(n_test, {'T': T_test, 'dT_dn': dT_dn_test}), validation_freq=10, callbacks=[callback, cp_callback])
 weights_after_train = model.layers[0].get_weights()[0]
-to_weights(model, 'after')
 
 
 # In[ ]:
@@ -174,7 +168,6 @@ def plot_gaussian_weights_v1(weights, path, before_after):
     plt.show()
     plt.close()
 
-import os
 def plot_derivative_energy(x, dT_dn, model, n, path):
     if not os.path.exists(path):
         os.makedirs(path)
@@ -196,7 +189,6 @@ plot_derivative_energy(x, dT_dn, model, n, path)
 # In[ ]:
 
 
-import pandas as pd
 df = pd.DataFrame([])
 df['loss'] = model.history.history['loss']
 df['dT_dn_loss'] = model.history.history['dT_dn_loss']

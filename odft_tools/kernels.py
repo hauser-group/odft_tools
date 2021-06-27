@@ -17,13 +17,15 @@ import tensorflow as tf
 import numpy as np
 import math
 
-
-class HarmonicKernel1DV1(Initializer):
-    # Costum Kernel for Harmonic dist.
+class ContinuousConvKernel1DV1(Initializer):
     def __init__(self,
                  weights_init,
+                 create_continuous_kernel=None,
                  random_init=False,
                  seed=None):
+
+        if not create_continuous_kernel:
+            raise ValueError("Set a continuous kernel")
 
         # check vatiables
         if len(weights_init) != 2:
@@ -37,6 +39,8 @@ class HarmonicKernel1DV1(Initializer):
 
         self.weights_init = weights_init
         self.random_init = random_init
+        self.create_continuous_kernel = create_continuous_kernel
+
 
     def __call__(self, shape, dtype=dtypes.float32):
         # Here we the gaussian kernel is set
@@ -50,109 +54,13 @@ class HarmonicKernel1DV1(Initializer):
         """
 
         dtype = _assert_float_dtype(dtype)
-        # Calc Harmonic kernel
-        gauss_kernel = gen_harmonic_kernel_v1_1D(
+
+        continuous_kernel = self.create_continuous_kernel(
             shape=shape,
             weights=self.weights_init,
             dtype=dtype,
             random_init=self.random_init)
-        return gauss_kernel
-
-    def get_config(self):
-        return {
-            "mean": self.weights_init[0],
-            "stddev": self.weights_init[1],
-            "raondom_init": self.random_init
-        }
-
-
-class TrigonometricsKernel1DV1(Initializer):
-    # Costum Kernel for Trigonometrics dist.
-    def __init__(self,
-                 weights_init,
-                 random_init=False,
-                 seed=None):
-
-        # check vatiables
-        if len(weights_init) != 2:
-            raise ValueError("weights_init length must be 2")
-
-        if weights_init[0] < 0:
-            raise ValueError("'mean' must be positive float")
-
-        if weights_init[1] < 0:
-            raise ValueError("'stddev' must be positive float")
-
-        self.weights_init = weights_init
-        self.random_init = random_init
-
-    def __call__(self, shape, dtype=dtypes.float32):
-        # Here we the gaussian kernel is set
-        """Returns a tensor object initialized as specified by the initializer.
-        Args:
-          shape: Shape of the tensor.
-          dtype: Optional dtype of the tensor. Only floating point types are
-              supported.
-        Raises:
-          ValueError: If the dtype is not floating point
-        """
-
-        dtype = _assert_float_dtype(dtype)
-        # Calc Harmonic kernel
-        trigom_kernel = gen_trigonometrics_kernel_v1_1D(
-            shape=shape,
-            weights=self.weights_init,
-            dtype=dtype,
-            random_init=self.random_init)
-        return trigom_kernel
-
-    def get_config(self):
-        return {
-            "mean": self.weights_init[0],
-            "stddev": self.weights_init[1],
-            "raondom_init": self.random_init
-        }
-
-
-class GaussianKernel1DV1(Initializer):
-    # Costum Kernel for gaussian dist.
-    def __init__(self,
-                 weights_init,
-                 random_init=False,
-                 seed=None):
-
-        # check vatiables
-        if len(weights_init) != 2:
-            raise ValueError("weights_init length must be 2")
-
-        if weights_init[0] < 0:
-            raise ValueError("'mean' must be positive float")
-
-        if weights_init[1] < 0:
-            raise ValueError("'stddev' must be positive float")
-
-        self.weights_init = weights_init
-        self.random_init = random_init
-
-    def __call__(self, shape, dtype=dtypes.float32):
-        # Here we the gaussian kernel is set
-        """Returns a tensor object initialized as specified by the initializer.
-        Args:
-          shape: Shape of the tensor.
-          dtype: Optional dtype of the tensor. Only floating point types are
-              supported.
-        Raises:
-          ValueError: If the dtype is not floating point
-        """
-
-        dtype = _assert_float_dtype(dtype)
-        # Calc gaussian kernel
-        gauss_kernel = gen_gaussian_kernel_v1_1D(
-            shape=shape,
-            weights=self.weights_init,
-            dtype=dtype,
-            random_init=self.random_init)
-        return gauss_kernel
+        return continuous_kernel
 
     def get_config(self):
         return {

@@ -1,18 +1,18 @@
-import os
 import h5py
-import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+import pandas as pd
+import os
 # from https://github.com/hauser-group/odft_tools
 from odft_tools.models_ccnn import (
     ClassicCNN,
-    ContCNNV1
-)
+    ContCNNV1DenseHarmonic,
+    ContCNNV1Dense
+    )
 
 from odft_tools.layers import (
-    IntegrateLayer,
-    Continuous1DConvV1
+    IntegrateLayer
 )
 
 from odft_tools.utils import (
@@ -102,7 +102,7 @@ n_test = n_test.reshape((-1, 500, 1))
 
 kernel_size = 100
 # Feel free to use larger kernel size (Manuel used 100) and larger networks (Manuels ResNet used layers=[32, 32, 32, 32, 32, 32]).
-model = ContCNNV1(layers=[32, 32, 32, 32, 32, 32], kernel_size=kernel_size, dx=dx)
+model = ContCNNV1Dense(layers=[32, 32, 32, 32, 32, 32], kernel_size=kernel_size, dx=dx)
 # Tell the model what input to expect. The first dimension (None) represents the batch size and remains undefinded.
 model.build(input_shape=(None, 500, 1))
 
@@ -122,40 +122,41 @@ initial_learning_rate = WarmupExponentialDecay(
 model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001, amsgrad=False),
               loss={'T': 'mse', 'dT_dn': 'mse'},
               loss_weights={'T': 0.2, 'dT_dn': 1.0}, # As recommended by Manuel: scale the loss in T by 0.2
-                metrics={'T': ['mae'], 'dT_dn': ['mae']})
-
-path = 'results/ContCNNV1/'
+              metrics={'T': ['mae'], 'dT_dn': ['mae']})
 
 callback = tf.keras.callbacks.EarlyStopping(
     monitor='loss',
-    patience=500,
+    patience=1000,
     restore_best_weights=True,
 )
 
-cp_callback = tf.keras.callbacks.ModelCheckpoint(
-    filepath=path + 'cp.ckpt',
-    save_freq=10
-)
-
 model.summary()
+
+
+# In[ ]:
+
 
 # Build a dataset that repeats the data (cast to float32) 10 times to reduce output in model.fit().
 # Note that this step is not necessary, you could simply feed the numpy arrays into the model.fit() method.
 training_dataset = tf.data.Dataset.from_tensor_slices((n.astype(np.float32), {'T': T.astype(np.float32), 'dT_dn': dT_dn.astype(np.float32)})).batch(100).repeat(10)
 
-def to_weights(model, before_after):
-    for lay in range(len(model.layers) - 1):
-        weights_layer = pd.DataFrame(model.layers[lay].get_weights()[0][:, 0, :])
-        if not os.path.exists(path + 'weigths/'):
-            os.makedirs(path + 'weigths/')
-        weights_layer.to_csv(path + 'weigths/' + 'weights'+ before_after + '_layer' + str(lay) + '.csv')
+path = 'results/ContCNNV1DenseGauss/'
+
+cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=path + 'cp.ckpt',
+                                                 save_freq=10)
+# In[ ]:
+
 
 # Beware when comparing the results to our paper. The output here is in Hartree!
-to_weights(model, 'before')
+
+# Beware when comparing the results to our paper. The output here is in Hartree!
 weights_before_train = model.layers[0].get_weights()[0]
-model.fit(training_dataset, epochs=3000, verbose=2, validation_data=(n_test, {'T': T_test, 'dT_dn': dT_dn_test}), validation_freq=10, callbacks=[callback, cp_callback])
-to_weights(model, 'after')
+model.fit(training_dataset, epochs=10000, verbose=2, validation_data=(n_test, {'T': T_test, 'dT_dn': dT_dn_test}), validation_freq=10, callbacks=[callback, cp_callback])
 weights_after_train = model.layers[0].get_weights()[0]
+
+
+# In[ ]:
+
 
 def plot_gaussian_weights_v1(weights, path, before_after):
     if not os.path.exists(path):
@@ -184,6 +185,10 @@ plot_gaussian_weights_v1(weights_before_train, path, 'before')
 plot_gaussian_weights_v1(weights_after_train, path, 'after')
 
 plot_derivative_energy(x, dT_dn, model, n, path)
+
+
+# In[ ]:
+
 
 df = pd.DataFrame([])
 df['loss'] = model.history.history['loss']

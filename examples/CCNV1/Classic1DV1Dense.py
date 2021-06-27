@@ -1,13 +1,12 @@
 import h5py
+import pandas as pd
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-import pandas as pd
-import os
 # from https://github.com/hauser-group/odft_tools
 from odft_tools.models_ccnn import (
-    ClassicCNN,
-    ContCNNV1DenseHarmonic
+    ClassicCNNV1Dense
 )
 
 from odft_tools.layers import (
@@ -37,15 +36,14 @@ tf.random.set_seed(seed)
 # In[ ]:
 
 
-# with h5py.File(data_path + 'M=100_training_data.hdf5', 'r') as f:
-#     keys = f.keys()
-#     print(keys)
-#     # build a dict (dataset.value has been deprecated. Use dataset[()] instead.)
-#     data = {key:f[key][()] for key in keys}
-with h5py.File(data_path + 'dataset_large.hdf5', 'r') as f:
+with h5py.File(data_path + 'M=100_training_data.hdf5', 'r') as f:
     keys = f.keys()
     # build a dict (dataset.value has been deprecated. Use dataset[()] instead.)
     data = {key:f[key][()] for key in keys}
+# with h5py.File(data_path + 'dataset_large.hdf5', 'r') as f:
+#     keys = f.keys()
+#     # build a dict (dataset.value has been deprecated. Use dataset[()] instead.)
+#     data = {key:f[key][()] for key in keys}
 
 
 # In[ ]:
@@ -101,7 +99,7 @@ n_test = n_test.reshape((-1, 500, 1))
 
 kernel_size = 100
 # Feel free to use larger kernel size (Manuel used 100) and larger networks (Manuels ResNet used layers=[32, 32, 32, 32, 32, 32]).
-model = ContCNNV1DenseHarmonic(layers=[32, 32, 32, 32, 32, 32], kernel_size=kernel_size, dx=dx)
+model = ClassicCNNV1Dense(layers=[32, 32, 32, 32, 32, 32], kernel_size=kernel_size, dx=dx)
 # Tell the model what input to expect. The first dimension (None) represents the batch size and remains undefinded.
 model.build(input_shape=(None, 500, 1))
 
@@ -129,6 +127,11 @@ callback = tf.keras.callbacks.EarlyStopping(
     restore_best_weights=True,
 )
 
+path = 'results/ClassicCNNV1Dense/'
+
+cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=path + 'cp.ckpt',
+                                                 save_freq=10)
+
 model.summary()
 
 
@@ -139,14 +142,9 @@ model.summary()
 # Note that this step is not necessary, you could simply feed the numpy arrays into the model.fit() method.
 training_dataset = tf.data.Dataset.from_tensor_slices((n.astype(np.float32), {'T': T.astype(np.float32), 'dT_dn': dT_dn.astype(np.float32)})).batch(100).repeat(10)
 
-path = 'results/ContCNNV1DenseHarmonic/'
-
-cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=path + 'cp.ckpt',
-                                                 save_freq=10)
 # In[ ]:
 
 
-# Beware when comparing the results to our paper. The output here is in Hartree!
 
 # Beware when comparing the results to our paper. The output here is in Hartree!
 weights_before_train = model.layers[0].get_weights()[0]
@@ -180,8 +178,8 @@ def plot_derivative_energy(x, dT_dn, model, n, path):
     plt.show()
     plt.close()
 
-plot_gaussian_weights_v1(weights_before_train, path, 'before')
-plot_gaussian_weights_v1(weights_after_train, path, 'after')
+# plot_gaussian_weights_v1(weights_before_train, path, 'before')
+# plot_gaussian_weights_v1(weights_after_train, path, 'after')
 
 plot_derivative_energy(x, dT_dn, model, n, path)
 
@@ -189,6 +187,7 @@ plot_derivative_energy(x, dT_dn, model, n, path)
 # In[ ]:
 
 
+import pandas as pd
 df = pd.DataFrame([])
 df['loss'] = model.history.history['loss']
 df['dT_dn_loss'] = model.history.history['dT_dn_loss']

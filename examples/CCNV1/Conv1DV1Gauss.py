@@ -18,18 +18,18 @@ from odft_tools.keras_utils import (
 )
 
 from odft_tools.utils import (
-    gen_harmonic_kernel_v1_1D
+    gen_gaussian_kernel_v1_1D
 )
 
 data_path = '../datasets/orbital_free_DFT/'
-path = 'results/ConvHarmonics/'
+path = 'results/ConvGaussian/'
 
 fitler_size = 32
 kernel_size = 100
 epoch = 30000
 dx = 0.002
 
-seed = 3
+seed = 0
 tf.random.set_seed(seed)
 
 kinetic_train, kinetic_derivativ_train, density_train = load_data_cnn(
@@ -70,7 +70,7 @@ model = CustomCNNV1Model(
     kernel_size=kernel_size,
     layer_length=5,
     dx=0.002,
-    create_continuous_kernel=gen_harmonic_kernel_v1_1D,
+    create_continuous_kernel=gen_gaussian_kernel_v1_1D,
     # kernel_regularizer=tf.keras.regularizers.l2(0.000025)
 )
 
@@ -100,7 +100,7 @@ training_dataset = tf.data.Dataset.from_tensor_slices(
 
 weights_before_train = model.layers[0].get_weights()[0]
 
-with tf.device('/device:GPU:0'):
+with tf.device('/device:GPU:1'):
     model.fit(
         training_dataset,
         epochs=epoch,
@@ -108,7 +108,7 @@ with tf.device('/device:GPU:0'):
         validation_data=(
             density_test, {'T': kinetic_test, 'dT_dn': kinetic_derivativ_test}
         ),
-        validation_freq=100, callbacks=[callback, cp_callback]
+        validation_freq=10, callbacks=[callback, cp_callback]
     )
 
 weights_after_train = model.layers[0].get_weights()[0]

@@ -18,24 +18,24 @@ from odft_tools.keras_utils import (
 )
 
 from odft_tools.utils import (
-    gen_trigonometrics_kernel_v1_1D
+    gen_harmonic_kernel_v1_1D
 )
 
 data_path = 'datasets/orbital_free_DFT/'
-path = 'results_new/CCNNTrigo'
+path = 'results_new/CCNNHarmOpt'
 
-fitler_size = 32
-kernel_size = 100
+fitler_size = 64
+kernel_size = 50
 layer_length = 5
 epoch = 100000
-activation = 'softplus'
+activation = 'exponential'
 dx = 0.002
 
 path = path + '_fitler_' + str(fitler_size) + '_kernel_' \
        + str(kernel_size) + '_len_' + str(layer_length) \
        + '_activation_' + activation + '/'
 
-seed = 0
+seed = 2
 tf.random.set_seed(seed)
 
 kinetic_train, kinetic_derivativ_train, density_train = load_data_cnn(
@@ -48,6 +48,12 @@ kinetic_test, kinetic_derivativ_test, density_test = load_data_cnn(
     data_name='test_data.hdf5'
 )
 
+
+# density = {'n': density_train.astype(np.float32)}
+# targetdata = {
+#     'T': kinetic_train.astype(np.float32),
+#     'dT_dn': kinetic_derivativ_train.astype(np.float32)
+# }
 
 initial_learning_rate = WarmupExponentialDecay(
     initial_learning_rate=0.0001,
@@ -71,7 +77,7 @@ model = CustomCNNV1Model(
     kernel_size=kernel_size,
     layer_length=5,
     dx=0.002,
-    create_continuous_kernel=gen_trigonometrics_kernel_v1_1D,
+    create_continuous_kernel=gen_harmonic_kernel_v1_1D,
     kernel_regularizer=tf.keras.regularizers.l2(0.000025),
     activation=activation
 )
@@ -122,5 +128,4 @@ x = np.linspace(0, 1, 500)
 plot_derivative_energy(x, kinetic_derivativ_train, model, density_train, path)
 
 df = save_losses(model, density_test, path)
-# plot_losses(loss=df['loss'], path=path)
-
+# plot_losses(loss=df, path=path)

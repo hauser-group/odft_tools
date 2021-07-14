@@ -1,14 +1,15 @@
 import numpy as np
-import keras
 import tensorflow as tf
-
+from tensorflow import keras
 from odft_tools.utils import (first_derivative_matrix,
                               second_derivative_matrix,
                               integrate)
 from odft_tools.layers import (
     IntegrateLayer,
     ContinuousConv1D,
-    Continuous1DConvV2
+    Continuous1DConvV2,
+    CustomExpandLayer,
+    CustomReduceLayer
 )
 
 from tensorflow.python.framework import dtypes
@@ -47,7 +48,8 @@ class ResNetConv1DModel(keras.Model):
         # Here we create the Model-
         # The kind of layers is set here
         density = tf.keras.layers.Input(shape=(500,), name='density')
-        value = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(density)
+        value = CustomExpandLayer()(density)
+        # value = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(density)
 
         for l in range(self.num_res_net_blocks):
             inputs = value
@@ -56,7 +58,7 @@ class ResNetConv1DModel(keras.Model):
                 kernel_size=self.kernel_size,
                 activation='softplus',
                 padding='same',
-                # kernel_regularizer=self.kernel_regularizer
+                kernel_regularizer=self.kernel_regularizer
             )(value)
 
             # res_net layer for '+ x'
@@ -65,21 +67,21 @@ class ResNetConv1DModel(keras.Model):
                 kernel_size=self.kernel_size,
                 activation=None,
                 padding='same',
-                # kernel_regularizer=self.kernel_regularizer
+                kernel_regularizer=self.kernel_regularizer
             )(value)
 
             value = tf.keras.layers.Add()([value, inputs])
-            value = tf.keras.layers.Activation('softplus', name='ahct' + str(l))(value)
+            value = tf.keras.layers.Activation('softplus')(value)
         # last layer is fixed to use a single filter
         value = tf.keras.layers.Conv1D(
                 filters=1,
                 kernel_size=self.kernel_size,
                 activation=None,
                 padding='same',
-                # kernel_regularizer=self.kernel_regularizer
+                kernel_regularizer=self.kernel_regularizer
             )(value)
-
-        dT_dn = tf.keras.layers.Lambda(lambda x: tf.reduce_sum(x, axis=-1), name='dT_dn')(value)
+        dT_dn = CustomReduceLayer()(value)
+        # dT_dn = tf.keras.layers.Lambda(lambda x: tf.reduce_sum(x, axis=-1), name='dT_dn')(value)
         T = IntegrateLayer(self.dx)(dT_dn)
 
         self.models = keras.Model(inputs={'n': density}, outputs={'T': T, 'dT_dn': dT_dn})
@@ -115,9 +117,10 @@ class ResNetCostumLayer1DModel(ResNetConv1DModel):
 
     def create_res_net_model(self):
         density = tf.keras.layers.Input(shape=(500,), name='density')
-        value = tf.keras.layers.Lambda(
-            lambda x: tf.expand_dims(x, axis=-1)
-        )(density)
+        value = CustomExpandLayer()(density)
+        # value = tf.keras.layers.Lambda(
+        #     lambda x: tf.expand_dims(x, axis=-1)
+        # )(density)
 
         for l in range(self.num_res_net_blocks):
             inputs = value
@@ -146,7 +149,7 @@ class ResNetCostumLayer1DModel(ResNetConv1DModel):
             )(value)
 
             value = tf.keras.layers.Add()([value, inputs])
-            value = tf.keras.layers.Activation('softplus',)(value)
+            value = tf.keras.layers.Activation(self.activation)(value)
 
         # last layer is fixed to use a single filter
         value = ContinuousConv1D(
@@ -159,11 +162,7 @@ class ResNetCostumLayer1DModel(ResNetConv1DModel):
             create_continuous_kernel=self.create_continuous_kernel,
             kernel_regularizer=self.kernel_regularizer
         )(value)
-
-        dT_dn = tf.keras.layers.Lambda(
-            lambda x: tf.reduce_sum(x, axis=-1),
-            name='dT_dn'
-        )(value)
+        dT_dn = CustomReduceLayer()(value)
 
         T = IntegrateLayer(self.dx)(dT_dn)
 
@@ -172,6 +171,441 @@ class ResNetCostumLayer1DModel(ResNetConv1DModel):
             outputs={'T': T, 'dT_dn': dT_dn}
         )
 
+class ResNetBeginLayer1DModel(ResNetConv1DModel):
+    def __init__(
+            self,
+            weights_gaus,
+            create_continuous_kernel,
+            activation,
+            random_init=True,
+            **kwargs):
+
+        super().__init__(**kwargs)
+
+        self.weights_gaus = weights_gaus
+        self.random_init = random_init
+        self.create_continuous_kernel = create_continuous_kernel
+        self.activation = activation
+
+    def create_res_net_model(self):
+        density = tf.keras.layers.Input(shape=(500,), name='density')
+        value = CustomExpandLayer()(density)
+
+        for l in range(self.num_res_net_blocks):
+            inputs = value
+            if l == 0:
+                value = ContinuousConv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=self.activation,
+                    padding='same',
+                    weights_init=self.weights_gaus,
+                    random_init=self.random_init,
+                    create_continuous_kernel=self.create_continuous_kernel,
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                # res_net layer for '+ x'
+                value = ContinuousConv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same',
+                    weights_init=self.weights_gaus,
+                    random_init=self.random_init,
+                    create_continuous_kernel=self.create_continuous_kernel,
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                value = tf.keras.layers.Add()([value, inputs])
+                value = tf.keras.layers.Activation(self.activation)(value)
+            else:
+                value = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=self.activation,
+                    padding='same',
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                # res_net layer for '+ x'
+                value = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same',
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                value = tf.keras.layers.Add()([value, inputs])
+                value = tf.keras.layers.Activation(self.activation)(value)
+
+        value = tf.keras.layers.Conv1D(
+                filters=1,
+                kernel_size=self.kernel_size,
+                activation=None,
+                padding='same',
+                kernel_regularizer=self.kernel_regularizer
+        )(value)
+
+        dT_dn = CustomReduceLayer()(value)
+
+        T = IntegrateLayer(self.dx)(dT_dn)
+
+        self.models = keras.Model(
+            inputs={'n': density},
+            outputs={'T': T, 'dT_dn': dT_dn}
+        )
+
+class ResNetBeginHalfLayer1DModel(ResNetConv1DModel):
+    def __init__(
+            self,
+            weights_gaus,
+            create_continuous_kernel,
+            activation,
+            random_init=True,
+            **kwargs):
+
+        super().__init__(**kwargs)
+
+        self.weights_gaus = weights_gaus
+        self.random_init = random_init
+        self.create_continuous_kernel = create_continuous_kernel
+        self.activation = activation
+
+    def create_res_net_model(self):
+        density = tf.keras.layers.Input(shape=(500,), name='density')
+        value = CustomExpandLayer()(density)
+
+        for l in range(self.num_res_net_blocks):
+            inputs = value
+            if l == 0 or l == 1 or l == 2 or l == 3:
+                value = ContinuousConv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=self.activation,
+                    padding='same',
+                    weights_init=self.weights_gaus,
+                    random_init=self.random_init,
+                    create_continuous_kernel=self.create_continuous_kernel,
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                # res_net layer for '+ x'
+                value = ContinuousConv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same',
+                    weights_init=self.weights_gaus,
+                    random_init=self.random_init,
+                    create_continuous_kernel=self.create_continuous_kernel,
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                value = tf.keras.layers.Add()([value, inputs])
+                value = tf.keras.layers.Activation(self.activation)(value)
+            else:
+                value = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=self.activation,
+                    padding='same',
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                # res_net layer for '+ x'
+                value = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same',
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                value = tf.keras.layers.Add()([value, inputs])
+                value = tf.keras.layers.Activation(self.activation)(value)
+
+        value = tf.keras.layers.Conv1D(
+                filters=1,
+                kernel_size=self.kernel_size,
+                activation=None,
+                padding='same',
+                kernel_regularizer=self.kernel_regularizer
+        )(value)
+
+        dT_dn = CustomReduceLayer()(value)
+
+        T = IntegrateLayer(self.dx)(dT_dn)
+
+        self.models = keras.Model(
+            inputs={'n': density},
+            outputs={'T': T, 'dT_dn': dT_dn}
+        )
+
+class ResNetEndLayer1DModel(ResNetConv1DModel):
+    def __init__(
+            self,
+            weights_gaus,
+            create_continuous_kernel,
+            activation,
+            random_init=True,
+            **kwargs):
+
+        super().__init__(**kwargs)
+
+        self.weights_gaus = weights_gaus
+        self.random_init = random_init
+        self.create_continuous_kernel = create_continuous_kernel
+        self.activation = activation
+
+    def create_res_net_model(self):
+        density = tf.keras.layers.Input(shape=(500,), name='density')
+        value = CustomExpandLayer()(density)
+
+        for l in range(self.num_res_net_blocks):
+            inputs = value
+            if l == 7:
+                value = ContinuousConv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=self.activation,
+                    padding='same',
+                    weights_init=self.weights_gaus,
+                    random_init=self.random_init,
+                    create_continuous_kernel=self.create_continuous_kernel,
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                # res_net layer for '+ x'
+                value = ContinuousConv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same',
+                    weights_init=self.weights_gaus,
+                    random_init=self.random_init,
+                    create_continuous_kernel=self.create_continuous_kernel,
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                value = tf.keras.layers.Add()([value, inputs])
+                value = tf.keras.layers.Activation(self.activation)(value)
+            else:
+                value = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=self.activation,
+                    padding='same',
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                # res_net layer for '+ x'
+                value = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same',
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                value = tf.keras.layers.Add()([value, inputs])
+                value = tf.keras.layers.Activation(self.activation)(value)
+
+        value = ContinuousConv1D(
+            filters=1,
+            kernel_size=self.kernel_size,
+            activation=None,
+            padding='same',
+            weights_init=self.weights_gaus,
+            random_init=self.random_init,
+            create_continuous_kernel=self.create_continuous_kernel,
+            kernel_regularizer=self.kernel_regularizer
+        )(value)
+
+        dT_dn = CustomReduceLayer()(value)
+
+        T = IntegrateLayer(self.dx)(dT_dn)
+
+        self.models = keras.Model(
+            inputs={'n': density},
+            outputs={'T': T, 'dT_dn': dT_dn}
+        )
+
+class ResNetEndHalfLayer1DModel(ResNetConv1DModel):
+    def __init__(
+            self,
+            weights_gaus,
+            create_continuous_kernel,
+            activation,
+            random_init=True,
+            **kwargs):
+
+        super().__init__(**kwargs)
+
+        self.weights_gaus = weights_gaus
+        self.random_init = random_init
+        self.create_continuous_kernel = create_continuous_kernel
+        self.activation = activation
+
+    def create_res_net_model(self):
+        density = tf.keras.layers.Input(shape=(500,), name='density')
+        value = CustomExpandLayer()(density)
+
+        for l in range(self.num_res_net_blocks):
+            inputs = value
+            if l == 4 or l == 5 or l == 6 or l == 7:
+                value = ContinuousConv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=self.activation,
+                    padding='same',
+                    weights_init=self.weights_gaus,
+                    random_init=self.random_init,
+                    create_continuous_kernel=self.create_continuous_kernel,
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                # res_net layer for '+ x'
+                value = ContinuousConv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same',
+                    weights_init=self.weights_gaus,
+                    random_init=self.random_init,
+                    create_continuous_kernel=self.create_continuous_kernel,
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                value = tf.keras.layers.Add()([value, inputs])
+                value = tf.keras.layers.Activation(self.activation)(value)
+            else:
+                value = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=self.activation,
+                    padding='same',
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                # res_net layer for '+ x'
+                value = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same',
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                value = tf.keras.layers.Add()([value, inputs])
+                value = tf.keras.layers.Activation(self.activation)(value)
+
+        value = ContinuousConv1D(
+            filters=1,
+            kernel_size=self.kernel_size,
+            activation=None,
+            padding='same',
+            weights_init=self.weights_gaus,
+            random_init=self.random_init,
+            create_continuous_kernel=self.create_continuous_kernel,
+            kernel_regularizer=self.kernel_regularizer
+        )(value)
+
+        dT_dn = CustomReduceLayer()(value)
+
+        T = IntegrateLayer(self.dx)(dT_dn)
+
+        self.models = keras.Model(
+            inputs={'n': density},
+            outputs={'T': T, 'dT_dn': dT_dn}
+        )
+
+class ResNetAlterLayer1DModel(ResNetConv1DModel):
+    def __init__(
+            self,
+            weights_gaus,
+            create_continuous_kernel,
+            activation,
+            random_init=True,
+            **kwargs):
+
+        super().__init__(**kwargs)
+
+        self.weights_gaus = weights_gaus
+        self.random_init = random_init
+        self.create_continuous_kernel = create_continuous_kernel
+        self.activation = activation
+
+    def create_res_net_model(self):
+        density = tf.keras.layers.Input(shape=(500,), name='density')
+        value = CustomExpandLayer()(density)
+
+        for l in range(self.num_res_net_blocks):
+            inputs = value
+            if l % 2 == 0:
+                value = ContinuousConv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=self.activation,
+                    padding='same',
+                    weights_init=self.weights_gaus,
+                    random_init=self.random_init,
+                    create_continuous_kernel=self.create_continuous_kernel,
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                # res_net layer for '+ x'
+                value = ContinuousConv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same',
+                    weights_init=self.weights_gaus,
+                    random_init=self.random_init,
+                    create_continuous_kernel=self.create_continuous_kernel,
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                value = tf.keras.layers.Add()([value, inputs])
+                value = tf.keras.layers.Activation(self.activation)(value)
+            else:
+                value = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=self.activation,
+                    padding='same',
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                # res_net layer for '+ x'
+                value = tf.keras.layers.Conv1D(
+                    filters=self.filter_size,
+                    kernel_size=self.kernel_size,
+                    activation=None,
+                    padding='same',
+                    kernel_regularizer=self.kernel_regularizer
+                )(value)
+
+                value = tf.keras.layers.Add()([value, inputs])
+                value = tf.keras.layers.Activation(self.activation)(value)
+
+        value = tf.keras.layers.Conv1D(
+                filters=1,
+                kernel_size=self.kernel_size,
+                activation=None,
+                padding='same',
+                kernel_regularizer=self.kernel_regularizer
+        )(value)
+
+        dT_dn = CustomReduceLayer()(value)
+
+        T = IntegrateLayer(self.dx)(dT_dn)
+
+        self.models = keras.Model(
+            inputs={'n': density},
+            outputs={'T': T, 'dT_dn': dT_dn}
+        )
 # In this Model we set the first layer as
 # Continuous CNN Version 2 --> the parameters of the
 # distribution are the weights
@@ -193,14 +627,11 @@ class ResNetContConv1DV2Model(ResNetConv1DModel):
         # Unpack the data. Its structure depends on your model and
         # on what you pass to `fit()`.
         x, y = data
-        import time
-        start = time.time()
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)  # Forward pass
             # Compute the loss value
             # (the loss function is configured in `compile()`)
             loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
-        end = time.time()
 
         # Compute gradients
         trainable_vars = self.trainable_variables
@@ -211,14 +642,12 @@ class ResNetContConv1DV2Model(ResNetConv1DModel):
         # Update metrics (includes the metric that tracks the loss)
         self.compiled_metrics.update_state(y, y_pred)
         # Return a dict mapping metric names to current value
-        print(f'elapsed time {end - start}')
-        assert False
         return {m.name: m.result() for m in self.metrics}
 
     def create_res_net_model(self):
         density = tf.keras.layers.Input(shape=(500,), name='density')
-        value = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(density)
-
+        # value = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(density)
+        value = CustomExpandLayer()(density)
         for l in range(self.num_res_net_blocks):
             inputs = value
 
@@ -254,10 +683,10 @@ class ResNetContConv1DV2Model(ResNetConv1DModel):
             weights_init=self.weights_gaus,
             random_init=self.random_init,
             costum_kernel_type=self.distribution
-            # kernel_regularizer=self.kernel_regularizer
+            kernel_regularizer=self.kernel_regularizer
         )(value)
 
-        dT_dn = tf.keras.layers.Lambda(lambda x: tf.reduce_sum(x, axis=-1), name='dT_dn')(value)
+        dT_dn = CustomReduceLayer()(value)
         T = IntegrateLayer(self.dx)(dT_dn)
 
         self.models = keras.Model(inputs={'n': density}, outputs={'T': T, 'dT_dn': dT_dn})

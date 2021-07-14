@@ -1,8 +1,15 @@
 import tensorflow as tf
-import numpy as np
+from tensorflow import keras
 
-from odft_tools.models_ccnn import (
-    CustomCNNV1Model
+import numpy as np
+# from https://github.com/hauser-group/odft_tools
+
+from odft_tools.models_resnet_ccn import (
+    ResNetAlterLayer1DModel
+)
+
+from odft_tools.utils import (
+    gen_gaussian_kernel_v1_1D
 )
 
 from odft_tools.utils_train import (
@@ -10,44 +17,44 @@ from odft_tools.utils_train import (
     plot_gaussian_weights_v1,
     save_losses,
     plot_losses,
-    load_data_cnn
+    load_data
 )
 
 from odft_tools.keras_utils import (
     WarmupExponentialDecay
 )
 
-from odft_tools.utils import (
-    gen_trigonometrics_kernel_v1_1D
-)
-
 data_path = 'datasets/orbital_free_DFT/'
-path = 'results_new/CCNNTrigo'
+path = 'results_new/ResNetExpAlter'
 
 fitler_size = 32
 kernel_size = 100
-layer_length = 5
+num_res_net_blocks = 8
 epoch = 100000
 activation = 'softplus'
-dx = 0.002
 
 path = path + '_fitler_' + str(fitler_size) + '_kernel_' \
-       + str(kernel_size) + '_len_' + str(layer_length) \
+       + str(kernel_size) + '_len_' + str(num_res_net_blocks) \
        + '_activation_' + activation + '/'
 
 seed = 0
 tf.random.set_seed(seed)
 
-kinetic_train, kinetic_derivativ_train, density_train = load_data_cnn(
+kinetic_train, kinetic_derivativ_train, density_train = load_data(
     path=data_path,
     data_name='M=100_training_data.hdf5'
 )
 
-kinetic_test, kinetic_derivativ_test, density_test = load_data_cnn(
+kinetic_test, kinetic_derivativ_test, density_test = load_data(
     path=data_path,
     data_name='test_data.hdf5'
 )
 
+density = {'n': density_train.astype(np.float32)}
+targetdata = {
+    'T': kinetic_train.astype(np.float32),
+    'dT_dn': kinetic_derivativ_train.astype(np.float32)
+}
 
 initial_learning_rate = WarmupExponentialDecay(
     initial_learning_rate=0.0001,
@@ -66,17 +73,22 @@ callback = tf.keras.callbacks.EarlyStopping(
     restore_best_weights=True,
 )
 
-model = CustomCNNV1Model(
+model = ResNetAlterLayer1DModel(
     filter_size=32,
     kernel_size=kernel_size,
-    layer_length=5,
+    layer_size=None,
+    num_res_net_blocks=num_res_net_blocks,
+    weights_gaus=[5, 5],
+    n_outputs=None,
+    random_init=True,
     dx=0.002,
-    create_continuous_kernel=gen_trigonometrics_kernel_v1_1D,
-    kernel_regularizer=tf.keras.regularizers.l2(0.000025),
+    create_continuous_kernel=gen_gaussian_kernel_v1_1D,
+    kernel_regularizer=tf.keras.regularizers.l2(0.00025),
     activation=activation
 )
 
-model.build(input_shape=(None, 500, 1))
+model.create_res_net_model()
+model.build(input_shape=(1, 500))
 model.compile(
     optimizer=tf.keras.optimizers.Adam(
         learning_rate=initial_learning_rate, amsgrad=False
@@ -87,40 +99,38 @@ model.compile(
 
 cp_callback = tf.keras.callbacks.ModelCheckpoint(
     filepath=path + 'cp.ckpt',
-    save_freq=100
+    save_freq=100000
 )
 
-model.summary()
+model.models.summary()
 
-training_dataset = tf.data.Dataset.from_tensor_slices(
-    (
-        density_train.astype(np.float32),
-        {'T': kinetic_train.astype(np.float32),
-        'dT_dn': kinetic_derivativ_train.astype(np.float32)}
-    )
-).batch(100).repeat(10)
+import time
 
+start = time.time()
 weights_before_train = model.layers[0].get_weights()[0]
 
 model.fit(
-    training_dataset,
-    epochs=epoch,
-    verbose=2,
-    validation_data=(
-        density_test, {'T': kinetic_test, 'dT_dn': kinetic_derivativ_test}
-    ),
-    validation_freq=100, callbacks=[callback]
+	x=density,
+        y=targetdata,
+        epochs=epoch,
+        verbose=2,
+        validation_data=(
+            density_test, {'T': kinetic_test, 'dT_dn': kinetic_derivativ_test}
+        ),
+        validation_freq=100, callbacks=[callback] # cp_callback
 )
 
 weights_after_train = model.layers[0].get_weights()[0]
+
+end = time.time()
+print(f'time elapsed {end - start}')
 
 plot_gaussian_weights_v1(weights_before_train, path, 'before')
 plot_gaussian_weights_v1(weights_after_train, path, 'after')
 
 x = np.linspace(0, 1, 500)
-
-plot_derivative_energy(x, kinetic_derivativ_train, model, density_train, path)
+plot_derivative_energy(x, kinetic_derivativ_test, model, density_test, path)
 
 df = save_losses(model, density_test, path)
-# plot_losses(loss=df['loss'], path=path)
 
+plot_losses(df=df, path=path)

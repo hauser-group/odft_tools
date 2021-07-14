@@ -20,10 +20,25 @@ from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import nn
 
 import tensorflow as tf
-import keras
+from tensorflow import keras
+
 import numpy as np
 import functools
 import six
+
+
+class CustomExpandLayer(tf.keras.layers.Layer):   # Inheritance class
+    # Define output
+    def call(self, inputdata):
+        output = tf.expand_dims(inputdata, axis=-1)
+        return output
+
+
+class CustomReduceLayer(tf.keras.layers.Layer):   # Inheritance class
+    # Define output
+    def call(self, inputdata):
+        output = tf.reduce_sum(inputdata, axis=-1)
+        return output
 
 
 class IntegrateLayer(tf.keras.layers.Layer):
@@ -42,7 +57,7 @@ class IntegrateLayer(tf.keras.layers.Layer):
         return config
 
 
-class ContinuousConv1D(keras.layers.convolutional.Conv1D):
+class ContinuousConv1D(keras.layers.Conv1D):
     def __init__(self,
                  weights_init,
                  create_continuous_kernel,
@@ -65,7 +80,7 @@ class ContinuousConv1D(keras.layers.convolutional.Conv1D):
 # distributions.
 # Here we had to set the parameters from the dist. as
 # the weights
-class Continuous1DConvV2(keras.layers.convolutional.Conv1D):
+class Continuous1DConvV2(keras.layers.Conv1D):
     """
     Arguments:
         filters: Integer, the dimensionality of the output space
@@ -192,7 +207,6 @@ class Continuous1DConvV2(keras.layers.convolutional.Conv1D):
             weights=self.weights_costum,
             kernel_dist=self.kernel_dist
         )
-        #
 
         outputs = self._convolution_op(inputs, costum_weights_kernel)
 

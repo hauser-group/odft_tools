@@ -34,32 +34,19 @@ from odft_tools.utils import (
 )
 
 
-
-# input_shape = tensor_shape.TensorShape(input_shape)
-# input_channel = self._get_input_channel(input_shape)
-
-# kernel_shape = (None, 500, 1)
-
-# generate_kernel(
-#         shape=self.kernel_shape,
-#         weights=[5, 10],
-#         kernel_dist=lorentz_dist
-# )
-
-
-
-data_path = '../datasets/orbital_free_DFT/'
+data_path = 'datasets/orbital_free_DFT/'
 
 
 kinetic_train, kinetic_derivativ_train, density_train = load_data(
     path=data_path,
-    data_name='dataset_large.hdf5'
+    data_name='M=100_training_data.hdf5'
 )
 
 kinetic_test, kinetic_derivativ_test, density_test = load_data(
     path=data_path,
-    data_name='dataset_validate.hdf5'
+    data_name='test_data.hdf5'
 )
+
 
 density = {'n': density_train.astype(np.float32)}
 targetdata = {
@@ -73,7 +60,7 @@ mean = 5
 stddev = 10
 
 res_net_blocks_count = 3
-epoch = 3
+epoch = 10
 
 path = 'results/'
 
@@ -109,7 +96,8 @@ model = ResNetContConv1DV2Model(
     n_outputs=None,
     random_init=True,
     dx=0.002,
-    distribution=distribution
+    distribution=distribution,
+    kernel_regularizer=tf.keras.regularizers.l2(0.0)
 )
 
 callback = tf.keras.callbacks.EarlyStopping(
@@ -133,26 +121,28 @@ cp_callback = tf.keras.callbacks.ModelCheckpoint(
     save_freq=1000
 )
 
+tboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs,
+                                                 histogram_freq = 1)
+
 model.models.summary()
 
 weights_before_train = model.layers[0].get_weights()[0]
 import time
 
 start = time.time()
-with tf.device('/device:GPU:0'):
-    model.fit(
-        x=density,
-        y=targetdata,
-        epochs=epoch,
-        verbose=2,
-        validation_data=(
-            density_test, {'T': kinetic_test, 'dT_dn': kinetic_derivativ_test}
-        ),
-        validation_freq=100,
-        callbacks=[callback, cp_callback])
+model.fit(
+    x=density,
+    y=targetdata,
+    epochs=epoch,
+    verbose=2,
+    validation_data=(
+        density_test, {'T': kinetic_test, 'dT_dn': kinetic_derivativ_test}
+    ),
+    validation_freq=100,
+    callbacks=[callback, tboard_callback])
 end = time.time()
 print(f'time elapsed {end - start}')
-assert False
+
 weights_after_train = model.layers[0].get_weights()[0]
 
 

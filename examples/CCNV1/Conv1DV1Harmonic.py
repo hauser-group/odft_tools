@@ -21,26 +21,33 @@ from odft_tools.utils import (
     gen_harmonic_kernel_v1_1D
 )
 
-data_path = '../datasets/orbital_free_DFT/'
-path = 'results/ConvHarmonics/'
+data_path = 'datasets/orbital_free_DFT/'
+path = 'results_new/CCNNHarmTest'
 
 fitler_size = 32
 kernel_size = 100
-epoch = 30000
+layer_length = 5
+epoch = 100
+activation = 'softplus'
 dx = 0.002
 
-seed = 3
+path = path + '_fitler_' + str(fitler_size) + '_kernel_' \
+       + str(kernel_size) + '_len_' + str(layer_length) \
+       + '_activation_' + activation + '/'
+
+seed = 5
 tf.random.set_seed(seed)
 
 kinetic_train, kinetic_derivativ_train, density_train = load_data_cnn(
     path=data_path,
-    data_name='dataset_large.hdf5'
+    data_name='M=100_training_data.hdf5'
 )
 
 kinetic_test, kinetic_derivativ_test, density_test = load_data_cnn(
     path=data_path,
-    data_name='dataset_validate.hdf5'
+    data_name='test_data.hdf5'
 )
+
 
 # density = {'n': density_train.astype(np.float32)}
 # targetdata = {
@@ -61,7 +68,7 @@ initial_learning_rate = WarmupExponentialDecay(
 
 callback = tf.keras.callbacks.EarlyStopping(
     monitor='dT_dn_loss',
-    patience=1000,
+    patience=5000,
     restore_best_weights=True,
 )
 
@@ -71,7 +78,8 @@ model = CustomCNNV1Model(
     layer_length=5,
     dx=0.002,
     create_continuous_kernel=gen_harmonic_kernel_v1_1D,
-    # kernel_regularizer=tf.keras.regularizers.l2(0.000025)
+    kernel_regularizer=tf.keras.regularizers.l2(0.0),
+    activation=activation
 )
 
 model.build(input_shape=(None, 500, 1))
@@ -100,16 +108,15 @@ training_dataset = tf.data.Dataset.from_tensor_slices(
 
 weights_before_train = model.layers[0].get_weights()[0]
 
-with tf.device('/device:GPU:0'):
-    model.fit(
-        training_dataset,
-        epochs=epoch,
-        verbose=2,
-        validation_data=(
-            density_test, {'T': kinetic_test, 'dT_dn': kinetic_derivativ_test}
-        ),
-        validation_freq=100, callbacks=[callback, cp_callback]
-    )
+model.fit(
+    training_dataset,
+    epochs=epoch,
+    verbose=2,
+    validation_data=(
+        density_test, {'T': kinetic_test, 'dT_dn': kinetic_derivativ_test}
+    ),
+    validation_freq=100, callbacks=[callback]
+)
 
 weights_after_train = model.layers[0].get_weights()[0]
 
@@ -120,5 +127,5 @@ x = np.linspace(0, 1, 500)
 
 plot_derivative_energy(x, kinetic_derivativ_train, model, density_train, path)
 
-df = save_losses(model, path)
+df = save_losses(model, density_test, path)
 # plot_losses(loss=df, path=path)

@@ -1,9 +1,3 @@
-from odft_tools.utils import (
-    gen_gaussian_kernel_v1_1D,
-    gen_harmonic_kernel_v1_1D,
-    gen_trigonometrics_kernel_v1_1D
-)
-
 from tensorflow.python.ops.init_ops_v2 import (
     Initializer,
     _RandomGenerator
@@ -16,6 +10,7 @@ from tensorflow.python.ops.init_ops import _compute_fans
 import tensorflow as tf
 import numpy as np
 import math
+
 
 class ContinuousConvKernel1DV1(Initializer):
     def __init__(self,

@@ -18,17 +18,17 @@ from odft_tools.keras_utils import (
 )
 
 from odft_tools.utils import (
-    gen_trigonometrics_kernel_v1_1D
+    gen_gaussian_kernel_v1_1D
 )
 
 data_path = 'datasets/orbital_free_DFT/'
-path = 'results_new/CCNNTrigo'
+path = 'results_new/CCNNGaussOpt'
 
-fitler_size = 32
-kernel_size = 100
+fitler_size = 64
+kernel_size = 50
 layer_length = 5
 epoch = 100000
-activation = 'softplus'
+activation = 'exponential'
 dx = 0.002
 
 path = path + '_fitler_' + str(fitler_size) + '_kernel_' \
@@ -69,10 +69,10 @@ callback = tf.keras.callbacks.EarlyStopping(
 model = CustomCNNV1Model(
     filter_size=32,
     kernel_size=kernel_size,
-    layer_length=5,
+    layer_length=layer_length,
     dx=0.002,
-    create_continuous_kernel=gen_trigonometrics_kernel_v1_1D,
-    kernel_regularizer=tf.keras.regularizers.l2(0.000025),
+    create_continuous_kernel=gen_gaussian_kernel_v1_1D,
+    kernel_regularizer=tf.keras.regularizers.l2(0.000001),
     activation=activation
 )
 
@@ -122,5 +122,4 @@ x = np.linspace(0, 1, 500)
 plot_derivative_energy(x, kinetic_derivativ_train, model, density_train, path)
 
 df = save_losses(model, density_test, path)
-# plot_losses(loss=df['loss'], path=path)
-
+# plot_losses(loss=df, path=path)

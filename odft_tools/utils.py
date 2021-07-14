@@ -251,9 +251,9 @@ def calc_harmonic(kernel_size, kernel_count):
             v = max_rang
         har = get_psi(v, q, hr)
 
-        har = (har_max - har_min) * (har - min(har)/(max(har) - min(har))) + har_min
+        # har = (har_max - har_min) * (har - min(har)/(max(har) - min(har))) + har_min
 
-        harmonics.append(har)
+        harmonics.append(har/100)
     return harmonics
 
 # @numba.njit(signature)
@@ -362,73 +362,73 @@ def gen_harmonic_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=
 
     return harmonic_kernels
 
-def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=False):
-    """ Returns a tensor object cotnaining gaussian kernels
-    Args:
-      shape: Shape of the tensor.
-      mean: mean of gaussian
-      stddev: stddev of gaussian
-      dtype: Optional dtype of the tensor. Only floating point types are
-         supported.
-    """
-    mean = weights[0]
-    stddev = weights[1]
-    kernel_size = shape[0]
-    input_size = shape[1]
-    filter_size = shape[2]
+# def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=False):
+#     """ Returns a tensor object cotnaining gaussian kernels
+#     Args:
+#       shape: Shape of the tensor.
+#       mean: mean of gaussian
+#       stddev: stddev of gaussian
+#       dtype: Optional dtype of the tensor. Only floating point types are
+#          supported.
+#     """
+#     mean = weights[0]
+#     stddev = weights[1]
+#     kernel_size = shape[0]
+#     input_size = shape[1]
+#     filter_size = shape[2]
 
-    gaus_kernel_count =  input_size * filter_size
+#     gaus_kernel_count =  input_size * filter_size
 
-    # Distribute unoform means and stddev
-    # lenght is kernel size times input size
-    if random_init:
-        means = np.random.uniform(
-            low=0.0,
-            high=mean * 2,
-            size=gaus_kernel_count
-        )
-        stddevs = np.random.uniform(
-            low=stddev,
-            high=stddev * 2,
-            size=gaus_kernel_count
-        )
-    else:
-        # Distribute means and stddevs around given mean and stddev
-        # random uniform
-        means = [mean] * gaus_kernel_count + np.random.uniform(
-            low=-mean / 2,
-            high=mean / 2,
-            size=gaus_kernel_count
-        )
+#     # Distribute unoform means and stddev
+#     # lenght is kernel size times input size
+#     if random_init:
+#         means = np.random.uniform(
+#             low=0.0,
+#             high=mean * 2,
+#             size=gaus_kernel_count
+#         )
+#         stddevs = np.random.uniform(
+#             low=stddev,
+#             high=stddev * 2,
+#             size=gaus_kernel_count
+#         )
+#     else:
+#         # Distribute means and stddevs around given mean and stddev
+#         # random uniform
+#         means = [mean] * gaus_kernel_count + np.random.uniform(
+#             low=-mean / 2,
+#             high=mean / 2,
+#             size=gaus_kernel_count
+#         )
 
-        stddevs = [stddev] * gaus_kernel_count + np.random.uniform(
-            low=-stddev / 2,
-            high=stddev / 2,
-            size=gaus_kernel_count
-        )
+#         stddevs = [stddev] * gaus_kernel_count + np.random.uniform(
+#             low=-stddev / 2,
+#             high=stddev / 2,
+#             size=gaus_kernel_count
+#         )
 
-    # calc gaussian kernel
-    gauss_kernels = calc_gaussians(
-        kernel_size,
-        gaus_kernel_count,
-        means,
-        stddevs,
-        random_init
-    )
+#     # calc gaussian kernel
+#     gauss_kernels = calc_gaussians(
+#         kernel_size,
+#         gaus_kernel_count,
+#         means,
+#         stddevs,
+#         random_init
+#     )
 
-    gauss_kernels = np.reshape(
-      gauss_kernels, (
-        filter_size,
-        input_size,
-        kernel_size
-        )
-      ).T
+#     gauss_kernels = np.reshape(
+#       gauss_kernels, (
+#         filter_size,
+#         input_size,
+#         kernel_size
+#         )
+#       ).T
 
-    gauss_kernels = tf.convert_to_tensor(
-        value=gauss_kernels,
-        dtype=dtype)
+#     gauss_kernels = tf.convert_to_tensor(
+#         value=gauss_kernels,
+#         dtype=dtype)
 
-    return gauss_kernels
+#     return gauss_kernels
 
 
 def G(x, alpha):

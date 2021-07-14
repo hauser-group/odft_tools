@@ -1,5 +1,4 @@
 import numpy as np
-import keras
 import tensorflow as tf
 
 from scipy.linalg import cho_solve, cholesky

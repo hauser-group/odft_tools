@@ -22,12 +22,13 @@ from odft_tools.utils import (
 )
 
 data_path = 'datasets/orbital_free_DFT/'
-path = 'results_new/CCNNTrigo'
+path = 'results_new/CCNNTrigoOpt'
 
-fitler_size = 32
-kernel_size = 100
+fitler_size = 64
+kernel_size = 50
 layer_length = 5
 epoch = 100000
+activation = 'exponential'
 activation = 'softplus'
 dx = 0.002
 

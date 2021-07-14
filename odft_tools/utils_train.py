@@ -4,9 +4,16 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import tensorflow_probability as tfp
 
 
-def save_losses(model, path):
+def save_losses(model, density, path):
+    kinetic_energy = tf.squeeze(model(density)['T'])
+    derivative_energy = tf.squeeze(model(density[0].reshape((1, 500, 1)).astype(np.float32))['dT_dn'])
+
+    std_kinetic = np.std(kinetic_energy)
+    std_derivative = np.std(derivative_energy)
+
     df = pd.DataFrame([])
     df_val = pd.DataFrame([])
     df['loss'] = model.history.history['loss']
@@ -18,7 +25,9 @@ def save_losses(model, path):
     df_val['val_T_loss'] = model.history.history['val_T_loss']
     df_val['val_dT_dn_loss'] = model.history.history['val_dT_dn_loss']
     df_val['val_T_mae'] = model.history.history['val_T_mae']
+    df_val['std_T'] = std_kinetic
     df_val['val_dT_dn_mae'] = model.history.history['val_dT_dn_mae']
+    df_val['std_dT_dn'] = std_derivative
     df.to_csv(path + 'losses.csv')
     df_val.to_csv(path + 'losses_val.csv')
     return df
@@ -37,9 +46,9 @@ def plot_gaussian_weights_v1(weights, path, before_after):
 def plot_derivative_energy(x, dT_dn, model, n, path):
     if not os.path.exists(path):
         os.makedirs(path)
-
+    dT_dn_model = tf.squeeze(model(n[0].reshape((1, 500, 1)).astype(np.float32))['dT_dn'])
     plt.plot(x, dT_dn[0])
-    plt.plot(x, tf.squeeze(model(n[0].reshape((1, 500, 1)).astype(np.float32))['dT_dn']))
+    plt.plot(x, dT_dn_model)
     plt.ylabel('dT_dn')
     plt.title('Comparison reference with trained energy derivative')
     plt.savefig(path + 'energy_derivatice.png')

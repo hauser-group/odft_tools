@@ -1,7 +1,6 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-import tensorflow_probability as tfp
 from scipy.linalg import cho_solve, cholesky
 from odft_tools.kernels import RBFKernel
 from odft_tools.utils import (first_derivative_matrix,

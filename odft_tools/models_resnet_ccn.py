@@ -81,7 +81,6 @@ class ResNetConv1DModel(keras.Model):
                 kernel_regularizer=self.kernel_regularizer
             )(value)
         dT_dn = CustomReduceLayer()(value)
-        # dT_dn = tf.keras.layers.Lambda(lambda x: tf.reduce_sum(x, axis=-1), name='dT_dn')(value)
         T = IntegrateLayer(self.dx)(dT_dn)
 
         self.models = keras.Model(inputs={'n': density}, outputs={'T': T, 'dT_dn': dT_dn})
@@ -658,7 +657,8 @@ class ResNetContConv1DV2Model(ResNetConv1DModel):
                 padding='same',
                 weights_init=self.weights_gaus,
                 random_init=self.random_init,
-                costum_kernel_type=self.distribution
+                costum_kernel_type=self.distribution,
+                kernel_regularizer=self.kernel_regularizer
             )(value)
 
             value = Continuous1DConvV2(
@@ -668,7 +668,8 @@ class ResNetContConv1DV2Model(ResNetConv1DModel):
                 padding='same',
                 weights_init=self.weights_gaus,
                 random_init=self.random_init,
-                costum_kernel_type=self.distribution
+                costum_kernel_type=self.distribution,
+                kernel_regularizer=self.kernel_regularizer
             )(value)
 
             value = tf.keras.layers.Add()([value, inputs])
@@ -682,11 +683,14 @@ class ResNetContConv1DV2Model(ResNetConv1DModel):
             padding='same',
             weights_init=self.weights_gaus,
             random_init=self.random_init,
-            costum_kernel_type=self.distribution
+            costum_kernel_type=self.distribution,
             kernel_regularizer=self.kernel_regularizer
         )(value)
 
         dT_dn = CustomReduceLayer()(value)
         T = IntegrateLayer(self.dx)(dT_dn)
 
-        self.models = keras.Model(inputs={'n': density}, outputs={'T': T, 'dT_dn': dT_dn})
+        self.models = keras.Model(
+            inputs={'n': density},
+            outputs={'T': T, 'dT_dn': dT_dn}
+        )

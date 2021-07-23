@@ -133,60 +133,54 @@ def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=
 
     return gauss_kernels
 
-def lorentz_dist(support, omega_0, gamma):
+def lorentz_dist(support, amp, omega_0, gamma):
     lorentz_kernel = 1/((support ** 2 - omega_0 ** 2) + (gamma ** 2) * (omega_0 ** 2))
     return lorentz_kernel
 
-def cauchy_dist(support, s, t):
-    cauchy_kernel = (1/np.pi)*s/(s ** 2 + (support - t) ** 2)
+def cauchy_dist(support, amp, s, t):
+    cauchy_kernel = amp * (1/np.pi)*s/(s ** 2 + (support - t) ** 2)
     return cauchy_kernel
 
-def gaussian_dist(support, mean, stddev):
-    gauss_kernel =  tf.math.exp(-((support - mean) ** 2)/(2*stddev ** 2))
-    gauss_kernel = gauss_kernel / tf.math.reduce_sum(gauss_kernel)
+def gaussian_dist(support, amp, mean, stddev):
+    gauss_kernel =  amp * tf.math.exp(-((support - mean) ** 2)/(2*stddev ** 2))
     return gauss_kernel
 
+@tf.function
 def generate_kernel(shape, weights, kernel_dist, dtype=dtypes.float32, random_init=False):
+    dist_max = 0.5
+    dist_min = -0.5
     weights_0 = tf.reshape(weights[0, :, :], [-1])
     weights_1 = tf.reshape(weights[1, :, :], [-1])
+    weights_2 = tf.reshape(weights[2, :, :], [-1])
 
     kernel_size = shape[0]
     input_size = shape[1]
     filter_size = shape[2]
 
     kernel_count =  input_size * filter_size
-
     truncate = kernel_size/2
     width = int(truncate + 0.5)
     kernels = tf.TensorArray(dtype, size=0, dynamic_size=True)
 
-    for i in tf.range(kernel_count):
+    shift = 0  # np.random.randint(-kernel_size/4, kernel_size/4)
 
-        shift = 0  # np.random.randint(-kernel_size/2, kernel_size/2)
-        support = tf.convert_to_tensor(
-            value=np.arange(
-                -width - shift,
-                width + 1 - shift
-                ),
+    grid = np.asarray(
+        [np.arange(-width - shift, width - shift)] * kernel_count
+    ).reshape(100, kernel_count)
 
-            dtype=dtype
-        )
-        center = int(len(support)/2)
-        left_cut = center - int(kernel_size/2)
-        right_cut = center + int(kernel_size/2)
+    support = tf.convert_to_tensor(
+        value=grid,
+        dtype=dtype
+    )
 
-        weight_0 = weights_0[i]
-        weight_1 = weights_1[i]
-
-        kernel = kernel_dist(support, weight_0, weight_1)
-
-        if (kernel_size % 2) != 0:
-            kernel = kernel[left_cut + 1:right_cut + 2]
-        else:
-            kernel = kernel[left_cut + 1:right_cut + 1]
-        kernels = kernels.write(kernels.size(), kernel)
-
-    kernels = kernels.stack()
+    if kernel_dist == 'cauchy':
+        kernels = (1/np.pi)*weights_1/(weights_1 ** 2 + (support - weights_2) ** 2)
+    elif kernel_dist == 'gaussian':
+        kernels =  weights_0 * tf.math.exp(-((support - weights_1) ** 2)/(2*weights_2 ** 2))
+    elif kernel_dist == 'lorentz':
+        kernels = 1/((support ** 2 - weights_1 ** 2) + (weights_2 ** 2) * (weights_1 ** 2))
+    kernels = (dist_max - dist_min) * (kernels - tf.reduce_min(kernels) \
+                /(tf.reduce_max(kernels) - tf.reduce_min(kernels))) + dist_min
     kernels = tf.transpose(
         tf.reshape(
             kernels,
@@ -209,11 +203,8 @@ def calc_trigonometrics(kernel_size, kernel_count):
     trig_max = 0.05
     trig_min = -0.05
     for i in range(kernel_count):
-        # if random.random() > 0.5:
         y = (random.random() * np.exp(-random.random()) * np.sin(random.random() * x)/(x) + random.random() * np.cos(random.random() * x)*np.exp(-random.random()))
-        # y = random.random() * np.sin(x * random.random() + random.randint(0, 50)) / x
-        # else:
-        #     y = random.random() * np.cos(x * random.random() + random.randint(0, 50)) / x
+
         y = (trig_max - trig_min) * (y - min(y)/(max(y) - min(y))) + trig_min
 
         trigonometris.append(y)
@@ -362,73 +353,6 @@ def gen_harmonic_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=
 
     return harmonic_kernels
 
-# def gen_gaussian_kernel_v1_1D(shape, weights, dtype=dtypes.float32, random_init=False):
-#     """ Returns a tensor object cotnaining gaussian kernels
-#     Args:
-#       shape: Shape of the tensor.
-#       mean: mean of gaussian
-#       stddev: stddev of gaussian
-#       dtype: Optional dtype of the tensor. Only floating point types are
-#          supported.
-#     """
-#     mean = weights[0]
-#     stddev = weights[1]
-#     kernel_size = shape[0]
-#     input_size = shape[1]
-#     filter_size = shape[2]
-
-#     gaus_kernel_count =  input_size * filter_size
-
-#     # Distribute unoform means and stddev
-#     # lenght is kernel size times input size
-#     if random_init:
-#         means = np.random.uniform(
-#             low=0.0,
-#             high=mean * 2,
-#             size=gaus_kernel_count
-#         )
-#         stddevs = np.random.uniform(
-#             low=stddev,
-#             high=stddev * 2,
-#             size=gaus_kernel_count
-#         )
-#     else:
-#         # Distribute means and stddevs around given mean and stddev
-#         # random uniform
-#         means = [mean] * gaus_kernel_count + np.random.uniform(
-#             low=-mean / 2,
-#             high=mean / 2,
-#             size=gaus_kernel_count
-#         )
-
-#         stddevs = [stddev] * gaus_kernel_count + np.random.uniform(
-#             low=-stddev / 2,
-#             high=stddev / 2,
-#             size=gaus_kernel_count
-#         )
-
-#     # calc gaussian kernel
-#     gauss_kernels = calc_gaussians(
-#         kernel_size,
-#         gaus_kernel_count,
-#         means,
-#         stddevs,
-#         random_init
-#     )
-
-#     gauss_kernels = np.reshape(
-#       gauss_kernels, (
-#         filter_size,
-#         input_size,
-#         kernel_size
-#         )
-#       ).T
-
-#     gauss_kernels = tf.convert_to_tensor(
-#         value=gauss_kernels,
-#         dtype=dtype)
-
-#     return gauss_kernels
 
 
 def G(x, alpha):

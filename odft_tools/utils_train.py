@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import matplotlib.pyplot as plt
-import tensorflow_probability as tfp
 
 
 def save_losses(model, density, path):
@@ -55,28 +54,31 @@ def plot_derivative_energy(x, dT_dn, model, n, path):
     plt.show()
     plt.close()
 
-def plot_gaussian_weights_v2(weights, mean, stddev, kernel_size, before_after, path):
+def plot_gaussian_weights_v2(weights, kernel_size, before_after, path, kernel_dist):
     if not os.path.exists('results' + path):
         os.makedirs('results' + path)
 
     truncate = kernel_size/2
-
+    shift = np.random.randint(-kernel_size/4, kernel_size/4)
+    shift = 0
+    # print(f'shift {shift}')
     width = int(truncate + 0.5)
-    support = np.arange(-width, width + 1)
+    support = np.arange(-width - shift, width + 1 - shift)
+    # support = np.arange(-width, width + 1)
     center = int(len(support)/2)
 
     left_cut = center - int(kernel_size/2)
     right_cut = center + int(kernel_size/2)
 
-    for mean, stddev in zip(weights[0][0], weights[1][0]):
-        gauss_kernel = np.exp(-((support - mean) ** 2)/(2*stddev ** 2))
-        gauss_kernel = gauss_kernel / gauss_kernel.sum()
+    for amp, mean, stddev in zip(weights[0][0], weights[1][0], weights[2][0]):
+
+        kernel = kernel_dist(support, amp, mean, stddev)
 
         if (kernel_size % 2) != 0:
-            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 2]
+            kernel = kernel[left_cut + 1:right_cut + 2]
         else:
-            gauss_kernel = gauss_kernel[left_cut + 1:right_cut + 1]
-        plt.plot(gauss_kernel)
+            kernel = kernel[left_cut + 1:right_cut + 1]
+        plt.plot(kernel)
     plt.ylabel('density')
     plt.xlabel('kernel size')
     plt.title('First Layer of model '+ before_after +' train')

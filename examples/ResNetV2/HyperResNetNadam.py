@@ -128,7 +128,7 @@ def train_test_model(hparams):
         validation_data=(
             density_test, {'T': kinetic_test, 'dT_dn': kinetic_derivativ_test}
         ),
-        validation_freq=epoch, callbacks=[callback, cp_callback]
+        validation_freq=epoch
     )
 
     loss = model.history.history['loss'][-1]

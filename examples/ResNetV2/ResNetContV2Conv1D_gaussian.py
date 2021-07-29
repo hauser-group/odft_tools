@@ -45,7 +45,7 @@ import os
 os.environ['TF_GPU_THREAD_MODE']='gpu_private'
 os.environ['TF_GPU_THREAD_COUNT']='1'
 
-data_path = '../datasets/orbital_free_DFT/'
+data_path = 'datasets/orbital_free_DFT/'
 logs='performance_log'
 
 kinetic_train, kinetic_derivativ_train, density_train = load_data(
@@ -72,7 +72,7 @@ mean = 5
 stddev = 10
 
 res_net_blocks_count = 3
-epoch = 1
+epoch = 10
 
 path = 'results/ResNetV2/'
 
@@ -86,7 +86,7 @@ training_dataset = tf.data.Dataset.from_tensor_slices(
         {'T': kinetic_train.astype(np.float32),
         'dT_dn': kinetic_derivativ_train.astype(np.float32)}
     )
-).batch(100).repeat(100)
+).batch(100) #.repeat(100)
 
 initial_learning_rate = WarmupExponentialDecay(
     initial_learning_rate=0.1,
@@ -128,9 +128,9 @@ callback = tf.keras.callbacks.EarlyStopping(
 model.create_res_net_model()
 model.build(input_shape=(1, 500))
 model.compile(
-    optimizer=tf.keras.optimizers.Adam(  # Adam
-        learning_rate=0.1 # initial_learning_rate,
-        # amsgrad=False
+    optimizer=tf.keras.optimizers.Adadelta(  # Adam
+        learning_rate=1.0, # initial_learning_rate,
+        rho=0.09
     ),
     loss={'T': 'mse', 'dT_dn': 'mse'},
     loss_weights={'T': 0.2, 'dT_dn': 1.0}, # As recommended by Manuel: scale the loss in T by 0.2
@@ -157,7 +157,7 @@ with tf.device('/device:GPU:0'):
     model.fit(
         training_dataset,
         epochs=epoch,
-        verbose=1,
+        verbose=2,
         validation_data=(
             density_test, {'T': kinetic_test, 'dT_dn': kinetic_derivativ_test}
         ),

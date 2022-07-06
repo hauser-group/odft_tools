@@ -9,7 +9,7 @@ HTMLParser==0.0.2
 importlib_metadata==4.11.1
 keyring==23.5.0
 lockfile==0.12.2
-lxml==4.8.0
+lxml==4.9.1
 matplotlib==3.5.1
 mock==4.0.3
 monotonic==1.6

@@ -15,7 +15,7 @@ mock==4.0.3
 monotonic==1.6
 numpy==1.22.2
 ordereddict==1.1
-protobuf==3.19.4
+protobuf==3.19.5
 pyOpenSSL==22.0.0
 simplejson==3.17.6
 tf-nightly

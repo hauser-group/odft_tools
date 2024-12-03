@@ -19,7 +19,7 @@ protobuf==3.19.5
 pyOpenSSL==22.0.0
 simplejson==3.17.6
 tf-nightly
-tornado==6.4.1
+tornado==6.4.2
 unicodedata2==14.0.0
 zipp==3.19.1
 jupyterlab

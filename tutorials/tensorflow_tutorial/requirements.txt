@@ -1,4 +1,4 @@
-brotli==1.0.9
+brotli==1.2.0
 ConfigParser==5.2.0
 cryptography==44.0.1
 Cython==0.29.28
